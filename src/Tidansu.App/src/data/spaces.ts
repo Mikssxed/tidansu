@@ -1,5 +1,5 @@
 import type { IconName } from '@/components/icons';
-import type { CanvasMode, Space, SpaceTypeId, Zone, ZoneColor } from '@/data/types';
+import type { CanvasMode, Rect, Space, SpaceTypeId, Zone, ZoneColor, ZoneKind } from '@/data/types';
 
 export const ZONE_COLORS: ZoneColor[] = ['blue', 'green', 'amber', 'pink', 'gray'];
 
@@ -57,6 +57,33 @@ export function buildZones(type: SpaceTypeId): Zone[] {
         column: 0,
         rect: null,
     }));
+}
+
+/** Create a single zone (used by the layout editor — add shelf / draw zone). */
+export function makeZone(opts: {
+    position: number;
+    colorIndex: number;
+    kind?: ZoneKind;
+    floor?: boolean;
+    column?: number;
+    rect?: Rect | null;
+}): Zone {
+    const floor = opts.floor ?? opts.kind === 'floor';
+    return {
+        id: uid('zone'),
+        position: opts.position,
+        label: null,
+        color: ZONE_COLORS[opts.colorIndex % ZONE_COLORS.length]!,
+        gridCols: floor ? 0 : 4,
+        gridRows: 1,
+        hasDepth: false,
+        floor,
+        kind: floor ? 'floor' : (opts.kind ?? 'shelf'),
+        facing: 'front',
+        levels: 1,
+        column: opts.column ?? 0,
+        rect: opts.rect ?? null,
+    };
 }
 
 export const FACINGS: [string, string][] = [

@@ -1,7 +1,7 @@
 import { parseAdd, matchZone } from '@/data/items';
 import { seedFridge } from '@/data/seed';
-import { uid } from '@/data/spaces';
-import type { Item, Space, ViewMode } from '@/data/types';
+import { flowFreeform, makeZone, uid } from '@/data/spaces';
+import type { Item, Rect, Space, ViewMode, Zone, ZoneKind } from '@/data/types';
 import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 
@@ -158,6 +158,59 @@ export const useSpacesStore = defineStore('spaces', () => {
         if (space) space.viewMode = mode;
     }
 
+    // ---- zones (layout editor) ----
+
+    /** Add a shelf to a column (structured/columns mode). Returns the new zone. */
+    function addZoneColumn(spaceId: string, column: number): Zone | null {
+        const space = getById(spaceId);
+        if (!space) return null;
+        const zone = makeZone({
+            position: space.zones.length + 1,
+            colorIndex: space.zones.length,
+            column,
+        });
+        space.zones.push(zone);
+        return zone;
+    }
+
+    /** Add a drawn zone on the free canvas. Returns the new zone. */
+    function addZoneFree(spaceId: string, rect: Rect, kind: ZoneKind): Zone | null {
+        const space = getById(spaceId);
+        if (!space) return null;
+        const zone = makeZone({
+            position: space.zones.length + 1,
+            colorIndex: space.zones.length,
+            kind,
+            rect,
+        });
+        space.zones.push(zone);
+        return zone;
+    }
+
+    function updateZone(spaceId: string, zoneId: string, patch: Partial<Zone>): void {
+        const space = getById(spaceId);
+        const zone = space?.zones.find((z) => z.id === zoneId);
+        if (zone) Object.assign(zone, patch);
+    }
+
+    /** Delete a zone and any items inside it. */
+    function deleteZone(spaceId: string, zoneId: string): void {
+        const space = getById(spaceId);
+        if (!space) return;
+        space.zones = space.zones.filter((z) => z.id !== zoneId);
+        space.items = space.items.filter((it) => it.zoneId !== zoneId);
+    }
+
+    /** Switch a columns-mode space to the free canvas, flowing existing zones into place. */
+    function convertToFreeform(spaceId: string): void {
+        const space = getById(spaceId);
+        if (!space) return;
+        space.canvasMode = 'freeform';
+        space.layoutColumns = 1;
+        space.columnLabels = null;
+        flowFreeform(space.zones);
+    }
+
     return {
         spaces,
         currentId,
@@ -174,5 +227,10 @@ export const useSpacesStore = defineStore('spaces', () => {
         removeItem,
         updateItem,
         setViewMode,
+        addZoneColumn,
+        addZoneFree,
+        updateZone,
+        deleteZone,
+        convertToFreeform,
     };
 });

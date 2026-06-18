@@ -36,13 +36,27 @@
             </div>
         </div>
 
-        <!-- Layout view (spatial layout + editor) — built in the next Phase 6 item -->
-        <div
-            v-else
-            class="mt-8 rounded-card border border-dashed border-border-strong p-10 text-center text-text-2"
-        >
-            Spatial layout view + editor are coming next in this phase.
-        </div>
+        <!-- Layout view + editor -->
+        <template v-else>
+            <LayoutEditor
+                v-if="editing"
+                :space="space"
+                @done="stopEditing"
+                @add-column-zone="onAddColumnZone"
+                @add-free-zone="onAddFreeZone"
+                @update-zone="onUpdateZone"
+                @delete-zone="onDeleteZone"
+                @convert="onConvert"
+            />
+            <LayoutView
+                v-else
+                :space="space"
+                :selected-id="selectedId"
+                @select="onSelect"
+                @add="onLayoutAdd"
+                @edit="startEditing"
+            />
+        </template>
 
         <ItemDetailModal
             :open="isDetailOpen"
@@ -54,16 +68,27 @@
             @remove="onRemove"
             @photo-locked="onPhotoLocked"
         />
+
+        <AddItemModal
+            :open="isAddOpen"
+            :zone-label="addZoneLabel"
+            @close="closeAdd"
+            @add="confirmAdd"
+        />
     </div>
 </template>
 
 <script setup lang="ts">
+    import AddItemModal from '@/components/space/AddItemModal.vue';
     import ItemDetailModal from '@/components/space/ItemDetailModal.vue';
     import ItemList from '@/components/space/ItemList.vue';
+    import LayoutView from '@/components/space/LayoutView.vue';
+    import LayoutEditor from '@/components/space/editor/LayoutEditor.vue';
     import SeeAsLayoutPromo from '@/components/space/SeeAsLayoutPromo.vue';
     import SmartAdd from '@/components/space/SmartAdd.vue';
     import SpaceHeader from '@/components/space/SpaceHeader.vue';
-    import type { ViewMode } from '@/data/types';
+    import { zoneName } from '@/data/spaces';
+    import type { ItemDepth, Rect, ViewMode, Zone, ZoneKind } from '@/data/types';
     import { useSessionStore } from '@/stores/useSessionStore';
     import { useSpacesStore } from '@/stores/useSpacesStore';
     import { computed, ref, watch } from 'vue';
@@ -81,6 +106,8 @@
     const selectedId = ref<string | null>(null);
     const lastZoneId = ref<string | null>(null);
     const promoDismissed = ref(false);
+    const editing = ref(false);
+    const addTarget = ref<{ zoneId: string; depth: ItemDepth; level: number } | null>(null);
 
     // Track the open space; bounce to the dashboard if the id is unknown (e.g. deleted).
     watch(
@@ -113,6 +140,12 @@
             space.value.items.length > 0
     );
 
+    const isAddOpen = computed(() => addTarget.value !== null);
+    const addZoneLabel = computed(() => {
+        const zone = space.value?.zones.find((z) => z.id === addTarget.value?.zoneId);
+        return zone && space.value ? zoneName(zone, space.value.type) : '';
+    });
+
     function onAdd(raw: string) {
         if (!space.value) return;
         const item = store.addItemSmart(space.value.id, raw);
@@ -139,5 +172,43 @@
     }
     function onPhotoLocked() {
         // Phase 7 opens the paywall (reason: photos) here.
+    }
+
+    // ---- layout view + editor ----
+    function startEditing() {
+        editing.value = true;
+    }
+    function stopEditing() {
+        editing.value = false;
+    }
+    function onLayoutAdd(payload: { zoneId: string; depth: ItemDepth; level: number }) {
+        addTarget.value = payload;
+    }
+    function closeAdd() {
+        addTarget.value = null;
+    }
+    function confirmAdd(payload: { name: string; qty: number }) {
+        const target = addTarget.value;
+        if (!space.value || !target) return;
+        const item = store.addItemStructured(space.value.id, payload.name, target.zoneId, payload.qty);
+        if (item) store.updateItem(space.value.id, item.id, { depth: target.depth, level: target.level });
+        addTarget.value = null;
+    }
+    function onAddColumnZone(column: number) {
+        // Phase 7 gates this with the zone-limit paywall.
+        if (space.value) store.addZoneColumn(space.value.id, column);
+    }
+    function onAddFreeZone(rect: Rect, kind: ZoneKind) {
+        // Phase 7 gates this with the zone-limit paywall.
+        if (space.value) store.addZoneFree(space.value.id, rect, kind);
+    }
+    function onUpdateZone(id: string, patch: Partial<Zone>) {
+        if (space.value) store.updateZone(space.value.id, id, patch);
+    }
+    function onDeleteZone(id: string) {
+        if (space.value) store.deleteZone(space.value.id, id);
+    }
+    function onConvert() {
+        if (space.value) store.convertToFreeform(space.value.id);
     }
 </script>

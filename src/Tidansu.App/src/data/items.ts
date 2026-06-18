@@ -1,5 +1,22 @@
 import { zoneName } from '@/data/spaces';
-import type { SpaceTypeId, Zone } from '@/data/types';
+import type { ItemDepth, Item, Space, SpaceTypeId, Zone } from '@/data/types';
+
+/** Items in a zone, optionally filtered by depth band / level, sorted by slot index. */
+export function itemsOf(
+    space: Space,
+    zoneId: string,
+    depth: ItemDepth | null = null,
+    level: number | null = null
+): Item[] {
+    return space.items
+        .filter(
+            (it) =>
+                it.zoneId === zoneId &&
+                (depth ? (it.depth || 'front') === depth : true) &&
+                (level ? (it.level || 1) === level : true)
+        )
+        .sort((a, b) => (a.slotIndex ?? 0) - (b.slotIndex ?? 0));
+}
 
 export interface ParsedAdd {
     name: string;
