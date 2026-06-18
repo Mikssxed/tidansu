@@ -1,0 +1,47 @@
+{
+    "name": "tidansu",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "vue-tsc -b && vite build",
+        "preview": "vite preview",
+        "build:api": "npm run build:api-file && npm run build:api-fix && npm run build:api-client && npm run build:api-patch",
+        "build:api-file": "swagger tofile --output ./src/api/api.json ../Tidansu.API/bin/Debug/net10.0/Tidansu.API.dll v1",
+        "build:api-fix": "node ./src/api/fix-openapi.mjs",
+        "build:api-client": "kiota generate --language typescript --openapi ./src/api/api.json --class-name apiClient --output ./src/api/apiClient --clean-output",
+        "build:api-patch": "node ./src/api/fix-generated.mjs"
+    },
+    "dependencies": {
+        "@microsoft/kiota-abstractions": "^1.0.0-preview.99",
+        "@microsoft/kiota-authentication-azure": "^1.0.0-preview.99",
+        "@microsoft/kiota-bundle": "^1.0.0-preview.99",
+        "@microsoft/kiota-http-fetchlibrary": "^1.0.0-preview.99",
+        "@microsoft/kiota-serialization-form": "^1.0.0-preview.99",
+        "@microsoft/kiota-serialization-json": "^1.0.0-preview.99",
+        "@microsoft/kiota-serialization-text": "^1.0.0-preview.99",
+        "@primeuix/themes": "^2.0.3",
+        "@tailwindcss/vite": "^4.1.17",
+        "@tanstack/vue-query": "^5.92.9",
+        "@vee-validate/zod": "^4.15.1",
+        "pinia": "^3.0.4",
+        "primevue": "^4.5.4",
+        "tailwind-merge": "^3.4.1",
+        "tailwindcss": "^4.1.17",
+        "vee-validate": "^4.15.1",
+        "vue": "^3.5.24",
+        "vue-router": "^5.0.2",
+        "zod": "^3.24.0"
+    },
+    "devDependencies": {
+        "@types/node": "^24.10.1",
+        "@vitejs/plugin-vue": "^6.0.1",
+        "@vue/tsconfig": "^0.8.1",
+        "prettier": "3.8.1",
+        "typescript": "~5.9.3",
+        "vite": "^7.2.4",
+        "vite-plugin-vue-devtools": "^8.0.6",
+        "vue-tsc": "^3.1.4"
+    }
+}

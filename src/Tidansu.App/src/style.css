@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+
+/*
+ * Tidansu design tokens — dark, warm-humanist, FLAT.
+ * Hairline borders, no gradients on components, no drop shadows except
+ * menu/modal elevation. All color in OKLCH. (See design_handoff_storebook.)
+ */
+@theme {
+    --font-sans:
+        'Hanken Grotesk', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji',
+        'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Surfaces */
+    --color-bg: oklch(0.165 0.006 264);
+    --color-surface: oklch(0.205 0.007 264);
+    --color-surface-2: oklch(0.245 0.008 264);
+    --color-surface-3: oklch(0.285 0.009 264);
+
+    /* Hairlines */
+    --color-border: color-mix(in oklch, white 9%, transparent);
+    --color-border-strong: color-mix(in oklch, white 15%, transparent);
+    --color-border-faint: color-mix(in oklch, white 5%, transparent);
+
+    /* Text */
+    --color-text: oklch(0.965 0.004 264);
+    --color-text-2: oklch(0.74 0.012 264);
+    --color-text-3: oklch(0.56 0.012 264);
+
+    /* Primary action — soft light-on-dark, not a saturated brand color */
+    --color-pri-bg: oklch(0.95 0.006 264);
+    --color-pri-fg: oklch(0.2 0.01 264);
+
+    /* Zone palette (equal L/C, hue varies). Pro accent = amber. */
+    --color-zone-blue: oklch(0.72 0.115 248);
+    --color-zone-green: oklch(0.75 0.115 158);
+    --color-zone-amber: oklch(0.81 0.105 80);
+    --color-zone-pink: oklch(0.74 0.115 350);
+    --color-zone-gray: oklch(0.72 0.022 264);
+
+    /* Pro accent alias */
+    --color-pro: oklch(0.81 0.105 80);
+
+    /* Status */
+    --color-warn: oklch(0.8 0.13 70);
+    --color-danger: oklch(0.7 0.16 25);
+    --color-ok: oklch(0.75 0.12 158);
+
+    /* Geometry (locked values) */
+    --radius-card: 16px;
+    --radius-ctrl: 11px;
+    --radius-chip: 999px;
+    --radius-xl2: 20px;
+}
+
+/*
+ * Non-utility design variables.
+ *   --pad: airy density multiplier (locked 1.18).
+ *   --gutter: page gutter used by layouts.
+ */
+:root {
+    --pad: 1.18;
+    --gutter: clamp(16px, 4vw, 28px);
+}
+
+html {
+    font-family: var(--font-sans);
+    scroll-behavior: smooth;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    width: 100%;
+    min-height: 100vh;
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+    box-sizing: inherit;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+}
+
+#app {
+    width: 100%;
+    min-height: 100vh;
+}
+
+/* Headings tighten further than the global tracking. */
+h1,
+h2,
+h3 {
+    letter-spacing: -0.03em;
+    margin: 0;
+}
+
+/* Elevation — only menus and modals use shadow; cards stay flat. */
+.elev-menu {
+    box-shadow: 0 12px 30px color-mix(in oklch, black 45%, transparent);
+}
+.elev-modal {
+    box-shadow: 0 24px 60px color-mix(in oklch, black 55%, transparent);
+}
+
+/* Eyebrow / kicker text. */
+.eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-text-3);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--color-surface-3);
+    border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklch, white 20%, transparent);
+}
