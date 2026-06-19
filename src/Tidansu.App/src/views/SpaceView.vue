@@ -1,7 +1,7 @@
 <template>
     <div
         v-if="space"
-        class="mx-auto w-full max-w-[1000px]"
+        class="mx-auto w-full max-w-[1240px] pt-6 sm:pt-8"
     >
         <SpaceHeader
             :space="space"
@@ -65,21 +65,24 @@
             :type="space.type"
             :can-photo="session.isPro"
             @close="closeDetail"
+            @edit="onEditItem"
             @remove="onRemove"
             @photo-locked="onPhotoLocked"
         />
 
-        <AddItemModal
-            :open="isAddOpen"
+        <ItemFormModal
+            :open="isFormOpen"
+            :mode="formMode"
             :zone-label="addZoneLabel"
-            @close="closeAdd"
-            @add="confirmAdd"
+            :item="formItem"
+            @close="closeForm"
+            @submit="onFormSubmit"
         />
     </div>
 </template>
 
 <script setup lang="ts">
-    import AddItemModal from '@/components/space/AddItemModal.vue';
+    import ItemFormModal from '@/components/space/ItemFormModal.vue';
     import ItemDetailModal from '@/components/space/ItemDetailModal.vue';
     import ItemList from '@/components/space/ItemList.vue';
     import LayoutView from '@/components/space/LayoutView.vue';
@@ -87,6 +90,8 @@
     import SeeAsLayoutPromo from '@/components/space/SeeAsLayoutPromo.vue';
     import SmartAdd from '@/components/space/SmartAdd.vue';
     import SpaceHeader from '@/components/space/SpaceHeader.vue';
+    import type { IconName } from '@/components/icons';
+    import { useLimits } from '@/composables/useLimits';
     import { zoneName } from '@/data/spaces';
     import type { ItemDepth, Rect, ViewMode, Zone, ZoneKind } from '@/data/types';
     import { useSessionStore } from '@/stores/useSessionStore';
@@ -98,6 +103,7 @@
 
     const store = useSpacesStore();
     const session = useSessionStore();
+    const limits = useLimits();
     const router = useRouter();
 
     const space = computed(() => store.getById(props.id));
@@ -108,6 +114,7 @@
     const promoDismissed = ref(false);
     const editing = ref(false);
     const addTarget = ref<{ zoneId: string; depth: ItemDepth; level: number } | null>(null);
+    const editId = ref<string | null>(null);
 
     // Track the open space; bounce to the dashboard if the id is unknown (e.g. deleted).
     watch(
@@ -140,7 +147,11 @@
             space.value.items.length > 0
     );
 
-    const isAddOpen = computed(() => addTarget.value !== null);
+    const isFormOpen = computed(() => addTarget.value !== null || editId.value !== null);
+    const formMode = computed<'add' | 'edit'>(() => (editId.value !== null ? 'edit' : 'add'));
+    const formItem = computed(
+        () => space.value?.items.find((it) => it.id === editId.value) ?? null
+    );
     const addZoneLabel = computed(() => {
         const zone = space.value?.zones.find((z) => z.id === addTarget.value?.zoneId);
         return zone && space.value ? zoneName(zone, space.value.type) : '';
@@ -148,6 +159,7 @@
 
     function onAdd(raw: string) {
         if (!space.value) return;
+        if (!limits.guard(limits.checkAddItem(space.value))) return;
         const item = store.addItemSmart(space.value.id, raw);
         if (item) lastZoneId.value = item.zoneId;
     }
@@ -171,7 +183,9 @@
         promoDismissed.value = true;
     }
     function onPhotoLocked() {
-        // Phase 7 opens the paywall (reason: photos) here.
+        // Close the item detail so the paywall sits cleanly on top (both teleport to body).
+        selectedId.value = null;
+        limits.openPaywall('photos');
     }
 
     // ---- layout view + editor ----
@@ -184,23 +198,65 @@
     function onLayoutAdd(payload: { zoneId: string; depth: ItemDepth; level: number }) {
         addTarget.value = payload;
     }
-    function closeAdd() {
-        addTarget.value = null;
+    function onEditItem(id: string) {
+        selectedId.value = null; // close the detail so the form sits cleanly on top
+        editId.value = id;
     }
-    function confirmAdd(payload: { name: string; qty: number }) {
+    function closeForm() {
+        addTarget.value = null;
+        editId.value = null;
+    }
+    function onFormSubmit(payload: {
+        name: string;
+        icon: IconName | null;
+        quantity: number;
+        expiry: string | null;
+    }) {
+        if (!space.value) return;
+
+        // Edit existing item.
+        if (editId.value) {
+            store.updateItem(space.value.id, editId.value, {
+                name: payload.name,
+                icon: payload.icon,
+                quantity: payload.quantity,
+                expiry: payload.expiry,
+            });
+            editId.value = null;
+            return;
+        }
+
+        // Add new item into the targeted zone/slot.
         const target = addTarget.value;
-        if (!space.value || !target) return;
-        const item = store.addItemStructured(space.value.id, payload.name, target.zoneId, payload.qty);
-        if (item) store.updateItem(space.value.id, item.id, { depth: target.depth, level: target.level });
+        if (!target) return;
+        if (!limits.guard(limits.checkAddItem(space.value))) {
+            addTarget.value = null;
+            return;
+        }
+        const item = store.addItemStructured(
+            space.value.id,
+            payload.name,
+            target.zoneId,
+            payload.quantity
+        );
+        if (item)
+            store.updateItem(space.value.id, item.id, {
+                icon: payload.icon,
+                expiry: payload.expiry,
+                depth: target.depth,
+                level: target.level,
+            });
         addTarget.value = null;
     }
     function onAddColumnZone(column: number) {
-        // Phase 7 gates this with the zone-limit paywall.
-        if (space.value) store.addZoneColumn(space.value.id, column);
+        if (!space.value) return;
+        if (!limits.guard(limits.checkAddZone(space.value))) return;
+        store.addZoneColumn(space.value.id, column);
     }
     function onAddFreeZone(rect: Rect, kind: ZoneKind) {
-        // Phase 7 gates this with the zone-limit paywall.
-        if (space.value) store.addZoneFree(space.value.id, rect, kind);
+        if (!space.value) return;
+        if (!limits.guard(limits.checkAddZone(space.value))) return;
+        store.addZoneFree(space.value.id, rect, kind);
     }
     function onUpdateZone(id: string, patch: Partial<Zone>) {
         if (space.value) store.updateZone(space.value.id, id, patch);

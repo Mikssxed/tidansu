@@ -1,18 +1,13 @@
 <template>
-    <div class="mt-2">
-        <!-- bar -->
-        <div class="flex items-center gap-3">
-            <button
-                type="button"
-                class="flex size-9 items-center justify-center rounded-ctrl border border-border bg-surface text-text-2 transition-colors hover:text-text"
-                aria-label="Back"
-                @click="onDone"
-            >
+    <div class="mt-6">
+        <!-- bar (own surface, clearly distinct from the space header) -->
+        <div class="flex items-center gap-3 rounded-card border border-border-strong bg-surface-2 p-3">
+            <span class="flex size-9 shrink-0 items-center justify-center rounded-ctrl bg-surface-3 text-text">
                 <BaseIcon
-                    name="arrowL"
-                    :size="18"
+                    name="edit"
+                    :size="17"
                 />
-            </button>
+            </span>
             <div class="min-w-0 flex-1">
                 <div class="text-[16px] font-bold">Edit layout</div>
                 <div class="text-[12px] text-text-3">{{ subtitle }}</div>
@@ -41,11 +36,11 @@
             </BaseButton>
         </div>
 
-        <!-- body -->
-        <div class="mt-4 flex flex-col gap-4 lg:flex-row">
+        <!-- body: full-width canvas with the properties panel always stacked below -->
+        <div class="mt-4 flex flex-col gap-4">
             <div
                 v-if="freeform"
-                class="flex shrink-0 gap-2 lg:flex-col"
+                class="flex shrink-0 flex-wrap gap-2"
             >
                 <button
                     v-for="t in tools"

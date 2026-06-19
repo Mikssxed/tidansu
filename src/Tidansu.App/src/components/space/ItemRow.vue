@@ -71,7 +71,7 @@
     const props = withDefaults(defineProps<ItemRowProps>(), { hideZone: false });
     const emit = defineEmits<{ select: [id: string]; remove: [id: string] }>();
 
-    const iconName = computed(() => itemIcon(props.item.name));
+    const iconName = computed(() => props.item.icon ?? itemIcon(props.item.name));
     const accentClass = computed(() =>
         props.zone ? zoneBgClasses[props.zone.color] : 'bg-zone-gray'
     );

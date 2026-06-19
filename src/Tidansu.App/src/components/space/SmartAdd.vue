@@ -1,7 +1,7 @@
 <template>
     <div>
         <div class="flex gap-2">
-            <div class="flex h-11 flex-1 items-center gap-2 rounded-ctrl border border-border bg-surface-2 px-3">
+            <div class="flex h-11 flex-1 items-center gap-2 rounded-ctrl border border-border bg-surface-2 px-3 focus-within:border-border-strong">
                 <BaseIcon
                     name="plus"
                     :size="18"

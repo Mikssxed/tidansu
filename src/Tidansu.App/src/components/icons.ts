@@ -52,6 +52,20 @@ export const ICON_PATHS = {
 
 export type IconName = keyof typeof ICON_PATHS;
 
+/** Curated food/storage icons offered in the item add/edit picker. */
+export const ITEM_ICONS: IconName[] = [
+    'package',
+    'milk',
+    'bottle',
+    'egg',
+    'bowl',
+    'cheese',
+    'jar',
+    'leaf',
+    'meat',
+    'box',
+];
+
 /** keyword -> category icon (no emoji, simple shapes). */
 export function itemIcon(name = ''): IconName {
     const n = name.toLowerCase();

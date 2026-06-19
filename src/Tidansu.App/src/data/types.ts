@@ -3,6 +3,8 @@
  * split per Pinia conventions; these are the plain data shapes shared across it.
  */
 
+import type { IconName } from '@/components/icons';
+
 export type Plan = 'free' | 'pro';
 
 export type SpaceTypeId = 'fridge' | 'freezer' | 'cellar' | 'cabinet' | 'list' | 'other';
@@ -50,6 +52,8 @@ export interface Item {
     slotIndex: number | null;
     depth: ItemDepth;
     level: number;
+    /** Optional icon override; falls back to itemIcon(name) when unset. */
+    icon?: IconName | null;
 }
 
 export type CanvasMode = 'columns' | 'freeform';

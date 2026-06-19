@@ -26,12 +26,12 @@
                 <div class="mt-0.5 truncate text-[11px] text-text-3">{{ z.meta }}</div>
                 <div
                     v-if="z.showLevels"
-                    class="mt-1 flex gap-0.5"
+                    class="mt-1 flex flex-col gap-0.5"
                 >
                     <i
                         v-for="n in z.levelBars"
                         :key="n"
-                        class="h-1 flex-1 rounded-chip"
+                        class="h-1 w-10 rounded-chip"
                         :class="z.accentClass"
                     />
                 </div>
@@ -267,6 +267,12 @@
         });
         const ghostBottom = ghost.value ? ghost.value.y + ghost.value.h : 0;
         const h = Math.max(360, ...bottoms, ghostBottom) + 64;
-        return { minHeight: `${h}px` };
+        // 24px (UNIT) alignment grid drawn with two faint hairline gradients.
+        const line = 'var(--color-border-faint)';
+        return {
+            minHeight: `${h}px`,
+            backgroundImage: `linear-gradient(to right, ${line} 1px, transparent 1px), linear-gradient(to bottom, ${line} 1px, transparent 1px)`,
+            backgroundSize: `${UNIT}px ${UNIT}px`,
+        };
     });
 </script>

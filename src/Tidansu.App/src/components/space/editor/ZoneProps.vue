@@ -1,5 +1,5 @@
 <template>
-    <div class="w-full shrink-0 rounded-card border border-border bg-surface p-4 lg:w-72">
+    <div class="w-full rounded-card border border-border bg-surface p-4">
         <div
             v-if="!zone"
             class="flex flex-col items-center gap-2 py-8 text-center text-text-3"
@@ -20,9 +20,9 @@
                 Zone properties
             </div>
 
-            <div class="mt-4 flex flex-col gap-4">
+            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <!-- Name -->
-                <div>
+                <div class="sm:col-span-2 lg:col-span-3">
                     <label class="mb-1 block text-[12px] text-text-2">Name</label>
                     <input
                         v-model="label"
@@ -90,6 +90,20 @@
                             </button>
                         </div>
                     </div>
+                    <!-- shelves stack top → bottom (level 1 = top) -->
+                    <div class="mt-2 flex flex-col gap-1">
+                        <div
+                            v-for="lvl in levelPreview"
+                            :key="lvl"
+                            class="flex items-center gap-1.5 rounded-[6px] border border-border bg-surface-2 px-2 py-1 text-[11px] text-text-2"
+                        >
+                            <span
+                                class="size-1.5 rounded-chip"
+                                :class="accentClass"
+                            />
+                            L{{ lvl }}
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Facing -->
@@ -149,6 +163,7 @@
                 <BaseButton
                     variant="danger"
                     size="sm"
+                    class="sm:col-span-2 lg:col-span-3"
                     @click="onDelete"
                 >
                     <BaseIcon
@@ -215,6 +230,12 @@
 
     const levels = computed(() => Math.max(1, props.zone?.levels || 1));
     const levelsAtMin = computed(() => levels.value <= 1);
+    const accentClass = computed(() =>
+        props.zone ? zoneBgClasses[props.zone.color] : 'bg-zone-gray'
+    );
+    const levelPreview = computed(() =>
+        Array.from({ length: Math.min(levels.value, 12) }, (_, i) => i + 1)
+    );
     const levelsAtMax = computed(() => levels.value >= 12);
 
     const facingOptions = computed(() => {

@@ -75,7 +75,7 @@
                         :size="24"
                     />
                 </div>
-                <h1 class="mt-4 text-[24px] font-bold leading-tight">Check your inbox</h1>
+                <h1 class="mt-6 text-[24px] font-bold leading-tight">Check your inbox</h1>
                 <p class="mt-2 text-[14px] text-text-2">
                     We sent a magic link to <span class="font-semibold text-text">{{ email }}</span>.
                 </p>

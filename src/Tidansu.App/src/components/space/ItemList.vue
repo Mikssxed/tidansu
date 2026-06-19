@@ -2,7 +2,7 @@
     <div>
         <!-- controls -->
         <div class="mt-4 flex flex-wrap items-center gap-3">
-            <div class="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-ctrl border border-border bg-surface-2 px-3">
+            <div class="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-ctrl border border-border bg-surface-2 px-3 focus-within:border-border-strong">
                 <BaseIcon
                     name="search"
                     :size="17"

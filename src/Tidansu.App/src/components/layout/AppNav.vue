@@ -1,7 +1,7 @@
 <template>
     <header class="border-b border-border bg-bg/80 backdrop-blur">
         <nav
-            class="mx-auto flex h-16 max-w-[1000px] items-center gap-4 px-[var(--gutter)]"
+            class="mx-auto flex h-16 max-w-[1240px] items-center gap-4 px-[var(--gutter)]"
         >
             <RouterLink
                 :to="{ name: 'spaces' }"

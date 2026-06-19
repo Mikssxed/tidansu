@@ -41,7 +41,7 @@
     const props = withDefaults(defineProps<Props>(), { size: 'md' });
     const emit = defineEmits<{ select: [id: string] }>();
 
-    const iconName = computed(() => itemIcon(props.item.name));
+    const iconName = computed(() => props.item.icon ?? itemIcon(props.item.name));
     const iconSize = computed(() => (props.size === 'sm' ? 13 : 15));
     const showQty = computed(() => props.item.quantity > 1);
     const qtyLabel = computed(() => `×${props.item.quantity}`);

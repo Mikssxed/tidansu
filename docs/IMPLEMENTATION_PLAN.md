@@ -7,10 +7,13 @@ Kiota + PrimeVue-unstyled + Tailwind v4 frontend).
 
 ## Status
 
-Phase 6 **partially** complete — list-view stack (smart add, item list/grouped,
-expiry chips, item-detail modal, see-as-layout promo, space chrome) done + browser-
-verified; **only the layout view + editor item remains**. `npm run build` green.
-**Next:** Phase 6 last item → spatial layout view + layout editor (add/draw zone).
+Phase 10.2 **complete** — editor follow-ups: the properties panel **always** stacks
+full-width below the canvas (fields in a responsive grid), and zone **levels stack
+top→bottom** (vertical L1…Ln preview in `ZoneProps` + vertical level bars on the
+`FreeCanvas` zone card). Builds on 10.1 (backdrop-close, wider app, icon override,
+`ItemFormModal` with expiry, etc.). All browser-verified. `npm run build` green.
+**Next:** Phase 11, item 1 → backend foundation (.NET Domain/Application/
+Infrastructure/API wiring, DbContext, JWT, migration).
 
 **Verification tooling:** Playwright Chrome (channel) needs admin, but bundled
 **Chromium** is installed and `playwright` is available via `npm i --no-save
@@ -147,41 +150,105 @@ verify*.mjs` script (gitignored) against `npm run dev`, then Read the PNGs in
   `ItemList` (search + List/By-zone accordion), `ItemRow` + `ItemExpiry` chips. _(ref: screens-list.jsx)_
 - [x] `ItemDetailModal` with photo slot (Free → Pro lock → emits `photoLocked`;
   paywall wired in Phase 7). _(ref: handoff item detail)_
-- [ ] Layout view (spatial zones) + Layout editor (add/draw zone). _(currently a
-  stub in `SpaceView`; build `screens-layout.jsx` + `screens-editor.jsx`)_
+- [x] Layout view (spatial zones) + Layout editor (add/draw zone). _(ported
+  `screens-layout.jsx` + `screens-editor.jsx`: `LayoutView` Shelves/Top toggle,
+  `ShelfElevation`/`ShelfUnit`/`MapZone`/`ItemChip`/`AddChip`, `LayoutTop`
+  (columns + freeform map); `LayoutEditor` with `ColumnsEdit`, `FreeCanvas`
+  (pointer draw/move/resize/snap), `ZoneProps`; `AddItemModal` for in-layout
+  adds; store `addZoneColumn`/`addZoneFree`/`updateZone`/`deleteZone`/
+  `convertToFreeform`)_
 
 ### Phase 7 — Plans + limit-enforcement + paywall
-- [ ] `useLimits` composable: pre-mutate checks for spaces≥2 / zones≥6 / items≥50 /
-  photos / sync → returns paywall `reason`. _(ref: handoff Plans & Limits)_
-- [ ] Wire enforcement into create/duplicate space (`spaces`), editor add-zone
-  (`zones`), smart-add (`items`), photo (`photos`), sync toggle (`sync`). _(ref: handoff "where each limit fires")_
-- [ ] `PaywallModal` keyed by `reason∈{spaces,zones,items,photos,sync}` with
+- [x] `useLimits` composable: pre-mutate checks for spaces≥2 / zones≥6 / items≥50 /
+  photos / sync → returns paywall `reason`. _(`checkAddSpace`/`checkAddZone`/
+  `checkAddItem`/`checkPhoto`/`checkSync` return the blocking reason or null;
+  `guard(reason)` opens the paywall + returns false; shared module-level
+  `paywallReason` ref + `openPaywall`/`closePaywall`.)_
+- [x] Wire enforcement into create/duplicate space (`spaces`), editor add-zone
+  (`zones`), smart-add (`items`), photo (`photos`), sync toggle (`sync`). _(create/
+  duplicate in `DashboardView`; add-zone (columns + freeform) and smart/in-layout
+  add in `SpaceView`; photo via `onPhotoLocked`. **Sync** firing point waits on the
+  Phase 9 Account toggle — `checkSync` is ready.)_
+- [x] `PaywallModal` keyed by `reason∈{spaces,zones,items,photos,sync}` with
   `PAYWALL` copy, Pro badge, benefits checklist, "See Pro plans"→/pricing, "Not
-  now", fine print. _(ref: 05-paywall.png, screens-paywall.jsx)_
-- [ ] Dashboard at-limit: amber upsell banner + locked New-space tile. _(ref: 04-dashboard.png)_
+  now", fine print. _(copy in `data/paywall.ts`; mounted once in `App.vue` so it
+  covers PLAIN-layout routes like SpaceView too.)_
+- [x] Dashboard at-limit: amber upsell banner + locked New-space tile. _(banner with
+  Upgrade→/pricing; New-space tile shows lock + "Upgrade for more spaces" / "You've
+  used all N on Free" when at the cap.)_
 
 ### Phase 8 — Pricing
-- [ ] `PricingView`: hero (eyebrow Plans, H1), monthly/yearly toggle (−20%), two
+- [x] `PricingView`: hero (eyebrow Plans, H1), monthly/yearly toggle (−20%), two
   plan cards (Free / Pro amber + badge; `$5/mo` or `$4/mo billed $48/yr`), feature
-  rows from `PLAN_FEATURES`. _(ref: 06-pricing.png, 07-pricing-plans.png)_
-- [ ] Comparison table (6 features × Free/Pro, Pro tinted) + FAQ (downgrade keeps
-  data read-only, cancel anytime). _(ref: screens-pricing.jsx)_
-- [ ] Upgrade→`pro` / downgrade→`free`, return to origin route. _(ref: handoff pricing behavior)_
+  rows from `PLAN_FEATURES`. _(added `PLAN_FEATURES`/`PlanFeature`/`PlanFeatureKey`
+  to `data/plans.ts`; `components/pricing/PlanCard.vue` (price/sub/save badge,
+  check/x feature rows, current/free/pro CTA).)_
+- [x] Comparison table (6 features × Free/Pro, Pro tinted) + FAQ (downgrade keeps
+  data read-only, cancel anytime). _(mapped `comparison` computed; 2-question FAQ.)_
+- [x] Upgrade→`pro` / downgrade→`free`, return to origin route. _(`session.setPlan`
+  + `returnToOrigin` (router.back with /spaces fallback); guests bounce to login
+  with `returnUrl=/pricing`.)_
 
 ### Phase 9 — Account / settings
-- [ ] `AccountView`: Profile card (initial avatar, name, email, plan pill). _(ref: 08-account.png)_
-- [ ] Plan card (Free→Upgrade CTA; Pro→Manage billing / Switch to Free). _(ref: screens-account.jsx)_
-- [ ] Usage meters: Spaces, Items across all spaces, Fullest space; warn color at cap. _(ref: 08-account.png)_
-- [ ] Sync toggle row (Pro-gated → paywall `sync`) + Sign out. _(ref: handoff account)_
+- [x] `AccountView`: Profile card (initial avatar, name, email, plan pill). _(`Back
+  to spaces` link; initial from name/email; `BaseBadge` plan pill, pro=amber+sparkle.)_
+- [x] Plan card (Free→Upgrade CTA; Pro→Manage billing / Switch to Free). _(`planLead`
+  computed; Upgrade/Manage→/pricing, Switch to Free→`setPlan('free')`.)_
+- [x] Usage meters: Spaces, Items across all spaces, Fullest space; warn color at cap.
+  _(reuses `UsageMeter`; `itemsCap` = items×max(1,count) (Infinity on Pro); per-space
+  hint shown on Free.)_
+- [x] Sync toggle row (Pro-gated → paywall `sync`) + Sign out. _(`onToggleSync` →
+  `guard(checkSync())`: Free opens the **sync** paywall, Pro flips `setSync`; closes
+  the deferred Phase 7 sync firing point. Sign out → `signOut` + /login.)_
 
 ### Phase 10 — Landing + polish + responsive
-- [ ] `LandingView`: hero 2-col (`1.05fr 0.95fr`), faux space-card illustration,
+- [x] `LandingView`: hero 2-col (`1.05fr 0.95fr`), faux space-card illustration,
   "How it works" band (3 steps), Features (3 cards), Pricing teaser, Final CTA,
-  footer. _(ref: 01-landing.png, screens-landing.jsx)_
-- [ ] Container-query responsive (~720/560px): grids→1 col, nav links hide, plan
-  cards stack. _(ref: handoff Responsive)_
-- [ ] Visual QA vs all 8 screenshots; flat hairline borders, no gradients/shadows
-  except menu/modal elevation; a11y (focus, tap targets, contrast). _(ref: handoff Fidelity)_
+  footer. _(own nav/footer with Tidansu wordmark; hero art = mapped `heroShelves`
+  with zone-accent strips + item chips; `steps`/`features`/teaser as mapped arrays.)_
+- [x] Container-query responsive (~720/560px): grids→1 col, nav links hide, plan
+  cards stack. _(implemented with the codebase's Tailwind breakpoint utilities —
+  `sm:`/`lg:` — for consistency: nav links `hidden sm:flex` (CTA `max-sm:ml-auto`),
+  hero `lg:grid-cols-[1.05fr_0.95fr]`, bands `sm:grid-cols-3` / teaser `lg:grid-cols-2`.)_
+- [x] Visual QA vs all 8 screenshots; flat hairline borders, no gradients/shadows
+  except menu/modal elevation; a11y (focus, tap targets, contrast). _(each screen
+  verified against its reference across phases; grep confirms no `shadow-`/`gradient`
+  outside `elev-modal`/`elev-menu`; added `focus-within:border-border-strong` to the
+  two transparent inputs (SmartAdd, ItemList search) — all other inputs already cue
+  focus via `border-border-strong`; icon-only buttons carry `aria-label`/`title`.)_
+
+### Phase 10.1 — UX refinements (post-frontend polish)
+User-reported fixes after walking the built frontend. _(ref: user feedback 2026-06-19.)_
+- [x] **Modal backdrop close:** moved the close handler onto the dim overlay div in
+  `BaseModal` (the `@click.self` on the outer wrapper never fired — the absolute
+  overlay intercepted clicks); added an explicit ✕ + Edit/Remove buttons to
+  `ItemDetailModal` so it's dismissable everywhere.
+- [x] **Space top spacing:** `SpaceView` root now `pt-6 sm:pt-8`.
+- [x] **Wider app + full-width layout:** `AppNav`/`DashboardView`/`SpaceView` →
+  `max-w-[1240px]` (dashboard grid `lg:grid-cols-3`); `LayoutEditor` body is now
+  `xl:flex-row` (canvas full-width with tool palette wrapping + properties panel
+  **below** until `xl`), `ZoneProps` `xl:w-72` — removes the cramped horizontal scroll.
+- [x] **Editor grid:** `FreeCanvas` draws a 24px (`UNIT`) alignment grid via two faint
+  `--color-border-faint` gradients in `canvasStyle`.
+- [x] **Distinguish editor chrome:** dropped the redundant editor back-arrow (Done
+  exits); the bar is now a filled `surface-2` card with a pencil icon + `mt-6`
+  spacing, clearly distinct from the space "Back to spaces" header.
+- [x] **Login spacing:** check badge → heading gap bumped (`mt-4`→`mt-6`).
+- [x] **Item icon override:** added optional `icon?: IconName` to `Item`; `ItemRow`,
+  `ItemChip`, `ItemDetailModal` use `item.icon ?? itemIcon(name)`.
+- [x] **Richer item add/edit:** new `ItemFormModal` (add + edit) — name, icon picker
+  (`ITEM_ICONS` + Auto), quantity and **expiry date**; replaces `AddItemModal`. Wired
+  layout add (creates then patches icon/expiry/depth/level) and a new Edit action on
+  `ItemDetailModal` (`updateItem`).
+
+### Phase 10.2 — Editor layout + levels follow-ups
+More user feedback after 10.1. _(ref: user feedback 2026-06-19.)_
+- [x] **Props always below:** `LayoutEditor` body is now always `flex-col` (tool
+  palette row → full-width canvas → properties panel); `ZoneProps` is full-width with
+  its fields in a `sm:grid-cols-2 lg:grid-cols-3` grid (Name + Delete span full).
+- [x] **Levels stack top→bottom:** `ZoneProps` Levels field now shows a vertical
+  L1…Ln preview (level 1 at top, accent dot each); `FreeCanvas` zone-card level bars
+  changed from a horizontal row to a vertical stack.
 
 ### Phase 11 — Backend foundation (.NET)
 - [ ] Flesh out Domain/Application/Infrastructure/API: `TidansuDbContext`
@@ -210,6 +277,187 @@ verify*.mjs` script (gitignored) against `npm run dev`, then Read the PNGs in
   webhook → set plan. _(ref: handoff pricing behavior)_
 
 ## Progress log
+
+### 2026-06-19 — Phase 10.2 complete (editor layout + levels)
+- **Props always below:** `LayoutEditor` body is now always `flex-col` (no
+  `xl:flex-row`) — tool palette wraps as a top row, canvas full-width, `ZoneProps`
+  below. `ZoneProps` root dropped `xl:w-72`; its body is a
+  `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3` with Name and Delete spanning all
+  columns so the full-width panel tiles cleanly.
+- **Levels top→bottom:** `ZoneProps` Levels field gained a vertical preview
+  (`levelPreview` = 1…min(levels,12); each row an accent-dotted `L{n}` chip,
+  level 1 on top); `FreeCanvas` zone-card level bars switched from `flex` (row) to
+  `flex flex-col` (stacked) with `w-10` bars.
+- **Browser-verified** (headless Chromium, 1440px): selected a freeform zone, bumped
+  Levels to 4 → properties panel renders below the canvas full-width, the L1–L4
+  preview stacks vertically, and the zone card shows 4 stacked level bars.
+  `levels:4`, zero console errors. `npm run build` green.
+- **Resume at:** Phase 11, item 1 — backend foundation (unchanged).
+
+### 2026-06-19 — Phase 10.1 complete (UX refinements)
+- **Modal backdrop:** `BaseModal` close handler moved to the dim overlay div (the
+  outer `@click.self` never fired). `ItemDetailModal` gained a ✕ close button and
+  Edit/Remove action buttons (replacing the ⋯ popover) + an `edit` emit.
+- **Layout/width:** `SpaceView` `pt-6 sm:pt-8` + `max-w-[1240px]`; `AppNav` and
+  `DashboardView` → `1240px` (cards `lg:grid-cols-3`); `LayoutEditor` body
+  `xl:flex-row` with the tool palette `flex-wrap xl:flex-col` and `ZoneProps`
+  `xl:w-72` (canvas full-width / props below until xl) — kills the horizontal scroll.
+- **Editor grid + chrome:** `FreeCanvas` `canvasStyle` adds a 24px two-gradient
+  alignment grid; the editor bar is now a `surface-2` card (pencil icon, `mt-6`),
+  redundant back-arrow removed (Done exits) — no longer confusable with the space
+  header.
+- **Items:** added optional `Item.icon` (`IconName`); `ItemRow`/`ItemChip`/
+  `ItemDetailModal` render `item.icon ?? itemIcon(name)`. New `ItemFormModal`
+  (add + edit) with name, icon picker (`ITEM_ICONS` const + Auto), quantity and
+  expiry-date input — replaces `AddItemModal`; `SpaceView` wires layout-add (create
+  then patch icon/expiry/depth/level) and item-edit (`updateItem`). Login state-B
+  badge→heading gap bumped.
+- **Browser-verified** (headless Chromium, `verify-ux.mjs`, gitignored, 1440px):
+  item detail opens then **closes on backdrop click** (`detailOpen:true`/
+  `detailClosed:true`); editing Milk set icon→`leaf`, qty→6, expiry; adding
+  "Test apple" persisted with `leaf` icon + expiry; editor grid/chrome/props-below
+  + wider layout render correctly; login spacing confirmed. Zero console errors.
+  `npm run build` green.
+- **Resume at:** Phase 11, item 1 — backend foundation (unchanged).
+
+### 2026-06-19 — Phase 10 complete (landing + polish + responsive) — FRONTEND DONE
+- **`views/LandingView.vue`:** full marketing page with its own chrome (Tidansu
+  wordmark nav + footer) — 2-col hero (`lg:grid-cols-[1.05fr_0.95fr]`) with copy +
+  a faux "My fridge" space-card illustration (mapped `heroShelves`: zone-accent
+  strip + item chips), "How it works" 3-step band, 3 feature cards, pricing teaser
+  (copy + Free/Pro mini-cards), final CTA, footer. Steps/features/shelves are
+  mapped computed-style arrays; all CTAs are `RouterLink`s to login/pricing.
+- **Responsive:** done with the codebase's Tailwind breakpoint utilities (matching
+  AppNav's `sm:` pattern) rather than literal container queries — nav links
+  `hidden sm:flex` with the CTA `max-sm:ml-auto`, hero collapses to 1 col below
+  `lg`, step/feature grids `sm:grid-cols-3`, teaser `lg:grid-cols-2`.
+- **QA / a11y pass:** grep confirms no `shadow-`/`gradient`/`drop-shadow` anywhere
+  except the `elev-modal`/`elev-menu` helpers; added `focus-within:border-border-
+  strong` to the two transparent-input wrappers (SmartAdd, ItemList search) so
+  keyboard focus is visible (the other inputs already cue via `border-border-
+  strong`); confirmed icon-only buttons carry `aria-label`/`title`.
+- **Browser-verified** (headless Chromium, `verify-landing.mjs` + viewport shot,
+  gitignored): desktop renders all sections faithfully; at 540/420px nav links hide
+  and hero/steps/features stack to one column; "Get started" routes to /login.
+  `navLinksVisibleDesktop:true`, `navLinksVisibleMobile:false`, `reachedLogin:true`,
+  zero console errors. `npm run build` green.
+- **Milestone:** Phases 1–10 complete — the full frontend (landing, auth, spaces
+  dashboard + CRUD, create-space onboarding, list/layout/editor space views, plans/
+  limits/paywall, pricing, account) is built, all on mocked Pinia state. Next is the
+  .NET backend (Phases 11–14), then swapping the stores to TanStack-Query-over-API.
+- **Resume at:** Phase 11, item 1 — backend foundation: flesh out Domain/Application/
+  Infrastructure/API (`TidansuDbContext` `IdentityDbContext<User>`, DI, JWT, Email,
+  MediatR/FluentValidation/AutoMapper, CORS/Serilog/Swagger, Kiota `build:api`,
+  initial migration).
+
+### 2026-06-19 — Phase 9 complete (account / settings)
+- **`views/AccountView.vue`:** four cards on a 640px column — (1) **Profile**
+  (initial avatar, name, email, plan pill via `BaseBadge`, pro=amber+sparkle);
+  (2) **Plan** (`planLead` copy; Free → "Upgrade to Pro"→/pricing; Pro → "Manage
+  billing"→/pricing + "Switch to Free"→`setPlan('free')`); (3) **Usage** — reuses
+  `UsageMeter` for Spaces (`caps.spaces`), Items all-spaces (`itemsCap` =
+  `caps.items × max(1,count)`, Infinity on Pro) and Fullest space (`caps.items`),
+  with a Free-only per-space hint; (4) **Sync** — Pro-gated toggle row (lock + Pro
+  badge on Free). `Back to spaces` link + full-width Sign out.
+- **Sync enforcement (closes deferred Phase 7 item):** `onToggleSync` →
+  `limits.guard(limits.checkSync())` — Free opens the **sync** paywall (no toggle),
+  Pro flips `session.setSync`. All five limit firing points (spaces/zones/items/
+  photos/sync) are now wired.
+- **Browser-verified** (headless Chromium, `verify-account.mjs`, gitignored):
+  Free → meters read 1/2 spaces, 10/50 items, 10/50 fullest, sync row locked;
+  clicking it → **sync** paywall. Upgraded to Pro → plan card flips to Manage
+  billing / Switch to Free, meters all "Unlimited", sync row unlocks; toggling it
+  persists `syncOn:true`. `plan:pro`, `syncPaywall:true`, zero console errors.
+  `npm run build` green.
+- All templates follow the purity rule (computed strings/classes, named handlers).
+- **Resume at:** Phase 10, item 1 — `LandingView` (hero 2-col, faux space-card
+  illustration, how-it-works, features, pricing teaser, final CTA, footer).
+
+### 2026-06-19 — Phase 8 complete (pricing)
+- **`data/plans.ts`:** added `PLAN_FEATURES` (6 rows: spaces/zones/items/photos/
+  sync/history with `fmt`), `PlanFeature` + `PlanFeatureKey` types — ported from
+  `data.jsx`.
+- **`components/pricing/PlanCard.vue`:** name + Pro/Current badges, tagline,
+  `$amt/mo` (yearly = round(priceY/12), monthly = priceM), sub line (`forever` /
+  `billed $48/yr` / `billed monthly`) + "save 20%" on Pro-yearly, check/x feature
+  rows (off rows muted), CTA computed by state (Current plan disabled / Switch to
+  Free secondary / Upgrade to Pro primary + sparkle). Pro card amber-tinted; current
+  card gets an amber ring.
+- **`views/PricingView.vue`:** Back link, hero (eyebrow/H1/sub), Monthly/Yearly
+  segmented toggle (−20%), two `PlanCard`s, "Everything compared" table (Pro column
+  tinted; mapped `comparison` computed), 2-question FAQ. `onUpgrade`/`onDowngrade`
+  call `session.setPlan` then `returnToOrigin` (router.back, /spaces fallback);
+  guests redirect to login with `returnUrl=/pricing`.
+- **Browser-verified** (headless Chromium, `verify-pricing.mjs`, gitignored):
+  yearly shows Pro $4/mo, monthly shows $5/mo; "Upgrade to Pro" → plan persists as
+  `pro` + returns to `/spaces` + nav pill flips to Pro; revisiting pricing shows Pro
+  "Current plan" (amber ring) and Free "Switch to Free". Zero console errors.
+  `npm run build` green.
+- All templates follow the purity rule (mapped computed arrays, computed classes,
+  named handlers).
+- **Resume at:** Phase 9, item 1 — `AccountView` profile card (initial avatar,
+  name, email, plan pill).
+
+### 2026-06-19 — Phase 7 complete (plans + limit-enforcement + paywall)
+- **`composables/useLimits.ts`:** pure pre-mutate checks (`checkAddSpace`/
+  `checkAddZone`/`checkAddItem`/`checkPhoto`/`checkSync`) returning the blocking
+  `PaywallReason | null`; `guard(reason)` opens the paywall and returns `false`
+  when blocked; shared **module-level** `paywallReason` ref (one paywall app-wide)
+  + `openPaywall`/`closePaywall`/`isPaywallOpen`.
+- **`data/paywall.ts`:** `PaywallReason` type (single source, re-exported by
+  `useLimits`), `PAYWALL` reason copy (icon/title/body(n)) + `PAYWALL_BENEFITS`
+  checklist — ported from `data.jsx`.
+- **`components/paywall/PaywallModal.vue`:** lock/reason icon, Pro badge, title,
+  cap-aware body, benefits list, "See Pro plans"→/pricing, "Not now", fine print.
+  Reads the shared state; **mounted once in `App.vue`** so it works on PLAIN-layout
+  routes (SpaceView/CreateSpace) too.
+- **Enforcement wired (check-before-mutate, never mutate on cap):** `DashboardView`
+  `goCreate`/`onDuplicate` → `spaces`; `SpaceView` `onAdd` (smart) + `confirmAdd`
+  (in-layout) → `items`, `onAddColumnZone`/`onAddFreeZone` → `zones`,
+  `onPhotoLocked` → `photos` (also closes the item detail so the paywall stacks on
+  top). Sync has no UI yet → deferred to Phase 9 (`checkSync` ready).
+- **Dashboard at-limit (`DashboardView`):** amber upsell banner (Upgrade→/pricing)
+  + New-space tile flips to a locked affordance (lock icon, "Upgrade for more
+  spaces", "You've used all N on Free") when `store.count >= caps.spaces`.
+- **Browser-verified** (headless Chromium, `verify-paywall.mjs`, gitignored):
+  duplicated fridge → 2/2 spaces, at-limit banner + locked tile render; locked tile
+  → **spaces** paywall ("Space limit reached", cap 2); editor Add-shelf 5→6 allowed
+  then 6→blocked → **zones** paywall (`fridgeZones` stayed 6 — no mutation); item
+  detail photo slot → **photos** paywall (detail closed, paywall on top). All three
+  `*Paywall:true`, `spaceCount:2`, zero console errors. `npm run build` green.
+- **Resume at:** Phase 8, item 1 — `PricingView` (hero, monthly/yearly toggle, Free
+  / Pro plan cards from `PLAN_FEATURES`).
+
+### 2026-06-19 — Phase 6 complete (layout view + editor)
+- **Layout view** (`components/space/layout/`): `LayoutView` (Shelves/Top
+  toggle, pill, view notes, Edit-layout button); `ShelfElevation` (walls grouped
+  by facing via `WALL_ORDER`/`FACINGS` + floor strip); `ShelfUnit` (per-unit
+  levels stack, front/back depth tabs, meta); `LayoutTop` (columns grid +
+  freeform mini-map with normalized offsets/canvas sizing); `MapZone` (top-down
+  zone card with depth bands); `ItemChip` (expiry-warn styling, qty, select) +
+  `AddChip`.
+- **Editor** (`components/space/editor/`): `LayoutEditor` shell (back/Done,
+  Draw-freely convert, tool palette); `ColumnsEdit` (structured per-column zone
+  list + Add-shelf); `FreeCanvas` (pointer-driven draw/move/resize on a snapped
+  24px grid, ghost rect, select + resize handle, delete tool, empty hint);
+  `ZoneProps` (name override, type seg, color swatches, levels stepper, facing
+  quad, depth toggle, column picker, delete). `AddItemModal` handles in-layout
+  adds (name + qty).
+- **Store:** `addZoneColumn`, `addZoneFree`, `updateZone`, `deleteZone`
+  (cascades item removal), `convertToFreeform` (`flowFreeform` re-flow). Wired
+  through `SpaceView`. Data helpers `itemsOf`/`FACINGS`/`WALL_ORDER`/
+  `ZONE_COLORS`/`makeZone`/`flowFreeform` confirmed present.
+- All new components follow **template purity** (mapped computed arrays for every
+  `v-for`, named handlers, computed classes — no template logic).
+- **Browser-verified** (headless Chromium, `verify-layout.mjs` + `verify-free.mjs`,
+  gitignored): Shelves + Top views render zones/items/expiry; AddChip → modal →
+  item added (10→11, "Test yogurt" on Shelf 1); columns editor lists zones +
+  ZoneProps panel; Draw-freely converts (5 zones flowed, `canvasMode:freeform`);
+  zone select shows resize handle; drawing in empty space creates "Shelf 6"
+  (5→6 zones). Zero console errors across all flows. `npm run build` green
+  (SpaceView chunk 48 kB).
+- **Resume at:** Phase 7, item 1 — `useLimits` composable (pre-mutate checks for
+  spaces≥2 / zones≥6 / items≥50 / photos / sync → paywall `reason`).
 
 ### 2026-06-18 — Phase 6 (part 1): list-view stack
 - **Data:** `data/dates.ts` (DAY/now/inDays/daysUntil/expiryStatus/expiryLabel;

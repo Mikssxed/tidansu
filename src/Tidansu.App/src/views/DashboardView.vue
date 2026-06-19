@@ -1,5 +1,5 @@
 <template>
-    <div class="mx-auto w-full max-w-[1000px]">
+    <div class="mx-auto w-full max-w-[1240px]">
         <!-- Header -->
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -24,6 +24,34 @@
             </div>
         </div>
 
+        <!-- At-limit upsell banner -->
+        <div
+            v-if="atSpaceLimit"
+            class="mt-6 flex flex-wrap items-center gap-3 rounded-card border border-warn/30 bg-warn/10 p-4"
+        >
+            <span class="flex size-8 shrink-0 items-center justify-center rounded-ctrl bg-warn/15 text-warn">
+                <BaseIcon
+                    name="sparkle"
+                    :size="16"
+                />
+            </span>
+            <p class="min-w-0 flex-1 text-[14px] text-text-2">
+                <span class="font-semibold text-text">You're at the Free limit.</span>
+                Upgrade to Pro for unlimited spaces, photos and sync across devices.
+            </p>
+            <BaseButton
+                variant="secondary"
+                size="sm"
+                @click="goPricing"
+            >
+                Upgrade
+                <BaseIcon
+                    name="arrowR"
+                    :size="15"
+                />
+            </BaseButton>
+        </div>
+
         <!-- Empty state -->
         <BaseEmptyState
             v-if="store.count === 0"
@@ -40,7 +68,7 @@
         <!-- Card grid -->
         <div
             v-else
-            class="mt-8 grid gap-4 sm:grid-cols-2"
+            class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
             <SpaceCard
                 v-for="space in store.spaces"
@@ -52,17 +80,18 @@
                 @delete="onDelete"
             />
 
-            <!-- New space tile -->
+            <!-- New space tile (locked affordance at the Free limit) -->
             <button
                 type="button"
-                class="flex min-h-[160px] flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-strong text-text-2 transition-colors hover:border-text-3 hover:text-text"
+                class="flex min-h-[160px] flex-col items-center justify-center gap-2 rounded-card border border-dashed border-border-strong px-4 text-center text-text-2 transition-colors hover:border-text-3 hover:text-text"
                 @click="goCreate"
             >
                 <BaseIcon
-                    name="plus"
+                    :name="newTileIcon"
                     :size="22"
                 />
-                <span class="text-[14px] font-medium">New space</span>
+                <span class="text-[14px] font-medium text-text">{{ newTileTitle }}</span>
+                <span class="text-[12px] text-text-3">{{ newTileDesc }}</span>
             </button>
         </div>
 
@@ -88,6 +117,8 @@
     import SpaceDeleteModal from '@/components/spaces/SpaceDeleteModal.vue';
     import SpaceRenameModal from '@/components/spaces/SpaceRenameModal.vue';
     import UsageMeter from '@/components/spaces/UsageMeter.vue';
+    import { useLimits } from '@/composables/useLimits';
+    import { isInf } from '@/data/plans';
     import type { Space } from '@/data/types';
     import { useSessionStore } from '@/stores/useSessionStore';
     import { useSpacesStore } from '@/stores/useSpacesStore';
@@ -96,6 +127,7 @@
 
     const store = useSpacesStore();
     const session = useSessionStore();
+    const limits = useLimits();
     const router = useRouter();
 
     const renameTarget = ref<Space | null>(null);
@@ -107,6 +139,19 @@
         return session.user ? `${spaces} · ${session.user.name}` : spaces;
     });
 
+    const atSpaceLimit = computed(
+        () => !isInf(session.caps.spaces) && store.count >= session.caps.spaces
+    );
+    const newTileIcon = computed(() => (atSpaceLimit.value ? 'lock' : 'plus'));
+    const newTileTitle = computed(() =>
+        atSpaceLimit.value ? 'Upgrade for more spaces' : 'New space'
+    );
+    const newTileDesc = computed(() =>
+        atSpaceLimit.value
+            ? `You've used all ${session.caps.spaces} on Free`
+            : 'Fridge, freezer, cabinet, cellar…'
+    );
+
     const isRenameOpen = computed(() => renameTarget.value !== null);
     const renameInitialName = computed(() => renameTarget.value?.name ?? '');
     const isDeleteOpen = computed(() => deleteTarget.value !== null);
@@ -114,8 +159,12 @@
     const deleteItemCount = computed(() => deleteTarget.value?.items.length ?? 0);
 
     function goCreate() {
-        // Phase 7 intercepts this with the paywall when at the Free space limit.
+        if (!limits.guard(limits.checkAddSpace())) return;
         router.push({ name: 'spacesNew' });
+    }
+
+    function goPricing() {
+        router.push({ name: 'pricing' });
     }
 
     function openSpace(id: string) {
@@ -128,7 +177,7 @@
     }
 
     function onDuplicate(id: string) {
-        // Phase 7 gates this behind the space limit.
+        if (!limits.guard(limits.checkAddSpace())) return;
         store.duplicateSpace(id);
     }
 

@@ -5,7 +5,19 @@
         @close="onClose"
     >
         <div v-if="item">
-            <div class="flex items-start gap-3">
+            <button
+                type="button"
+                class="absolute right-4 top-4 flex size-8 items-center justify-center rounded-ctrl text-text-2 transition-colors hover:bg-surface-2 hover:text-text"
+                aria-label="Close"
+                @click="onClose"
+            >
+                <BaseIcon
+                    name="x"
+                    :size="16"
+                />
+            </button>
+
+            <div class="flex items-start gap-3 pr-9">
                 <span class="flex size-11 shrink-0 items-center justify-center rounded-ctrl bg-surface-2 text-text-2">
                     <BaseIcon
                         :name="iconName"
@@ -16,15 +28,31 @@
                     <h2 class="text-[19px] font-bold text-text">{{ item.name }}</h2>
                     <p class="text-[13px] text-text-3">{{ qtyLabel }}</p>
                 </div>
-                <BasePopoverMenu label="Item actions">
-                    <BasePopoverMenuItem
-                        icon="trash"
-                        danger
-                        @click="onRemove"
-                    >
-                        Remove item
-                    </BasePopoverMenuItem>
-                </BasePopoverMenu>
+            </div>
+
+            <div class="mt-4 flex gap-2">
+                <BaseButton
+                    variant="secondary"
+                    size="sm"
+                    @click="onEdit"
+                >
+                    <BaseIcon
+                        name="edit"
+                        :size="15"
+                    />
+                    Edit
+                </BaseButton>
+                <BaseButton
+                    variant="secondary"
+                    size="sm"
+                    @click="onRemove"
+                >
+                    <BaseIcon
+                        name="trash"
+                        :size="15"
+                    />
+                    Remove
+                </BaseButton>
             </div>
 
             <dl class="mt-5 flex flex-col gap-2.5">
@@ -85,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-    import { BaseBadge, BaseIcon, BaseModal, BasePopoverMenu, BasePopoverMenuItem } from '@/components/base';
+    import { BaseBadge, BaseButton, BaseIcon, BaseModal } from '@/components/base';
     import { itemIcon } from '@/components/icons';
     import ItemExpiry from '@/components/space/ItemExpiry.vue';
     import { zoneBgClasses } from '@/composables/useColorVariant';
@@ -104,12 +132,15 @@
     const props = defineProps<Props>();
     const emit = defineEmits<{
         close: [];
+        edit: [id: string];
         remove: [id: string];
         photoLocked: [];
         addPhoto: [id: string];
     }>();
 
-    const iconName = computed(() => (props.item ? itemIcon(props.item.name) : 'package'));
+    const iconName = computed(() =>
+        props.item ? (props.item.icon ?? itemIcon(props.item.name)) : 'package'
+    );
     const qtyLabel = computed(() => (props.item ? `Quantity ×${props.item.quantity}` : ''));
     const accentClass = computed(() => (props.zone ? zoneBgClasses[props.zone.color] : 'bg-zone-gray'));
     const zonePillName = computed(() => (props.zone ? zoneName(props.zone, props.type) : ''));
@@ -129,6 +160,9 @@
 
     function onClose() {
         emit('close');
+    }
+    function onEdit() {
+        if (props.item) emit('edit', props.item.id);
     }
     function onRemove() {
         if (props.item) emit('remove', props.item.id);

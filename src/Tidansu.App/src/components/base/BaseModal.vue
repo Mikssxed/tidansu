@@ -9,6 +9,7 @@
                 <div
                     class="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
                     aria-hidden="true"
+                    @click="onBackdrop"
                 />
                 <div
                     class="elev-modal relative w-full rounded-xl2 border border-border bg-surface p-[calc(20px*var(--pad))]"

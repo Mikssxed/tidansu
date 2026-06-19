@@ -47,3 +47,26 @@ export const PLANS: Record<Plan, PlanDef> = {
 export const isInf = (n: number): boolean => !isFinite(n);
 
 export const planOf = (plan: Plan | null | undefined): PlanDef => PLANS[plan ?? 'free'];
+
+/** Numeric/boolean PlanDef fields surfaced as feature rows on pricing + account. */
+export type PlanFeatureKey = 'spaces' | 'zones' | 'items' | 'photos' | 'sync' | 'history';
+
+export interface PlanFeature {
+    key: PlanFeatureKey;
+    label: string;
+    fmt: (value: number | boolean) => string;
+}
+
+/** Feature rows for the pricing cards + comparison table, ported from data.jsx. */
+export const PLAN_FEATURES: PlanFeature[] = [
+    { key: 'spaces', label: 'Spaces', fmt: (v) => (isInf(v as number) ? 'Unlimited' : `${v} spaces`) },
+    {
+        key: 'zones',
+        label: 'Cabinets & shelves',
+        fmt: (v) => (isInf(v as number) ? 'Unlimited' : `${v} per space`),
+    },
+    { key: 'items', label: 'Items', fmt: (v) => (isInf(v as number) ? 'Unlimited' : `${v} per space`) },
+    { key: 'photos', label: 'Item photos', fmt: (v) => (v ? 'Yes' : '—') },
+    { key: 'sync', label: 'Sync across devices', fmt: (v) => (v ? 'Yes' : 'This device only') },
+    { key: 'history', label: 'Change history', fmt: (v) => (v ? 'Yes' : '—') },
+];
