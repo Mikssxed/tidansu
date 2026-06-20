@@ -7,13 +7,21 @@ Kiota + PrimeVue-unstyled + Tailwind v4 frontend).
 
 ## Status
 
-Phase 10.2 **complete** — editor follow-ups: the properties panel **always** stacks
-full-width below the canvas (fields in a responsive grid), and zone **levels stack
-top→bottom** (vertical L1…Ln preview in `ZoneProps` + vertical level bars on the
-`FreeCanvas` zone card). Builds on 10.1 (backdrop-close, wider app, icon override,
-`ItemFormModal` with expiry, etc.). All browser-verified. `npm run build` green.
-**Next:** Phase 11, item 1 → backend foundation (.NET Domain/Application/
-Infrastructure/API wiring, DbContext, JWT, migration).
+Phase 11 **complete** — backend foundation: the .NET solution now has a working
+Clean-Architecture backbone. **Domain** (`User : IdentityUser`, `RefreshToken`,
+`IJwtService`/`IEmailService`, four domain exceptions, `IRefreshTokensRepository`);
+**Application** (`AddApplication` wiring MediatR + `ValidationBehavior` +
+AutoMapper + FluentValidation + `IUserContext`); **Infrastructure**
+(`TidansuDbContext : IdentityDbContext<User>`, `AddInfrastructure` with SqlServer
+DbContext + Identity stores + JWT + FluentEmail, `JwtService`/`JwtSettings`,
+file-based `EmailService`, `RefreshTokensRepository`); **API** (`Program.cs`
+pipeline, `AddPresentation` with JWT auth + CORS + Swagger + rate-limiter +
+compression + Serilog, `ErrorHandlingMiddleware`, `ApiOperationResult`,
+`StringExtensions`). Kiota `build:api` scripts + `fix-openapi.mjs`/`fix-generated.mjs`
+ported. `InitialCreate` migration created **and applied** to localdb. `dotnet build`
+green (0 errors; 10 inherited NU1903 warnings); API boots → `/swagger/v1/swagger.json`
+200 + SPA `/` 200. **Next:** Phase 12, item 1 → real magic-link auth (`User`
++Plan/SyncOn, `MagicLinkToken` entity + repo).
 
 **Verification tooling:** Playwright Chrome (channel) needs admin, but bundled
 **Chromium** is installed and `playwright` is available via `npm i --no-save
@@ -251,7 +259,7 @@ More user feedback after 10.1. _(ref: user feedback 2026-06-19.)_
   changed from a horizontal row to a vertical stack.
 
 ### Phase 11 — Backend foundation (.NET)
-- [ ] Flesh out Domain/Application/Infrastructure/API: `TidansuDbContext`
+- [x] Flesh out Domain/Application/Infrastructure/API: `TidansuDbContext`
   (`IdentityDbContext<User>`), DI `ServiceCollectionExtensions`, `JwtService`/
   `JwtSettings`, `EmailService` (file in dev), MediatR + FluentValidation +
   AutoMapper wiring; CORS/Serilog/Swagger; Kiota `build:api` scripts; initial
@@ -277,6 +285,59 @@ More user feedback after 10.1. _(ref: user feedback 2026-06-19.)_
   webhook → set plan. _(ref: handoff pricing behavior)_
 
 ## Progress log
+
+### 2026-06-20 — Phase 11 complete (backend foundation)
+- **Domain** (`src/Tidansu.Domain`): `Entities/User.cs` (`User : IdentityUser`,
+  minimal — `RefreshTokens` nav; Plan/SyncOn deferred to Phase 12),
+  `Entities/RefreshToken.cs`; `Interfaces/IJwtService.cs` (+refresh) and
+  `IEmailService.cs` (generic `SendEmailAsync(to,subject,html)` — no template files);
+  `Exceptions/{NotFound,Validation,Authentication,Forbid}Exception.cs`;
+  `Repositories/IRefreshTokensRepository.cs`.
+- **Application** (`src/Tidansu.Application`): `Behaviors/ValidationBehavior.cs`
+  (FluentValidation → domain `ValidationException`), `User/CurrentUser.cs` +
+  `User/UserContext.cs` (`IUserContext`), `Extensions/ServiceCollectionExtensions.cs`
+  `AddApplication` (MediatR + open `ValidationBehavior` + AutoMapper + validators +
+  `IUserContext` + `AddHttpContextAccessor`) — assembly-scans cleanly with zero
+  handlers/profiles registered so far.
+- **Infrastructure** (`src/Tidansu.Infrastructure`):
+  `Persistence/TidansuDbContext.cs` (`IdentityDbContext<User>` + `RefreshTokens`
+  DbSet, unique `TokenHash` index, cascade FK); `Services/JwtService.cs` +
+  `JwtSettings.cs` (HS256 access token, random refresh, SHA-256 hash-at-rest);
+  `Services/EmailService.cs` (writes rendered HTML to `DevelopmentEmails/` in dev,
+  SMTP in prod); `Repositories/RefreshTokensRepository.cs`;
+  `Extensions/ServiceCollectionExtensions.cs` `AddInfrastructure` (SqlServer
+  DbContext, `AddIdentityApiEndpoints<User>` + roles + EF stores, IdentityOptions,
+  JWT, FluentEmail dev/prod sender, repos).
+- **API** (`src/Tidansu.API`): `Program.cs` (AddInfrastructure/Presentation/
+  Application, migrate-on-startup guarded by conn string, ErrorHandling →
+  Swagger(dev)/HSTS(prod) → security headers → compression → static SPA → **CORS** →
+  rate-limiter → auth(z) → controllers → SPA fallback);
+  `Extensions/WebApplicationBuilderExtensions.cs` `AddPresentation` (JWT bearer w/
+  prod secret guard, `frontend` CORS policy from `AppSettings:FrontendUrl`,
+  controllers + `JsonStringEnumConverter`, SwaggerGen w/ bearer, `auth` rate-limit
+  policy, Brotli/Gzip compression, Serilog); `Extensions/StringExtensions.cs`
+  (`ToCamelCase`), `Middlewares/ErrorHandlingMiddleware.cs` (domain-exception → HTTP),
+  `Models/ApiOperationResult.cs`. Namespaces use RootNamespace `Tidansu`
+  (`Tidansu.Extensions`/`.Middlewares`/`.Models`).
+- **Config:** `appsettings.json` (AppSettings/SmtpSettings/JwtSettings(no secret)/
+  Serilog console+file) + `appsettings.Development.json` (localdb conn string,
+  dev JWT secret, localhost SMTP, console Serilog, `FrontendUrl=:5173`).
+- **Kiota pipeline:** `src/Tidansu.App/src/api/fix-openapi.mjs` +
+  `fix-generated.mjs` ported; `build:api*` npm scripts already pointed at Tidansu.
+- **Migration:** `dotnet ef migrations add InitialCreate` (Identity tables +
+  RefreshTokens) → `20260620200904_InitialCreate` + snapshot; **applied** to
+  `(localdb)\MSSQLLocalDB` Database `TidansuDb` via `database update`.
+- **Verified:** `dotnet build` 0 errors (10 inherited NU1903 warnings — AutoMapper
+  12.0.1 / System.Security.Cryptography.Xml 9.0.0, pre-existing pins); `dotnet run`
+  boots → `GET /swagger/v1/swagger.json` 200 (empty paths — no controllers yet),
+  `GET /` 200 serving the built SPA `index.html`.
+- **Deviations from SelfGrind:** `IEmailService` is a generic HTML sender (no
+  Razor templates / EmailModels / csproj content hack) so Phase 12 supplies the
+  magic-link copy; `User` kept minimal (no domain props yet); seeded a `frontend`
+  CORS policy (SelfGrind relied on same-origin). No dev-user seeding (auth is
+  Phase 12). `RefreshToken` table shipped now to avoid Phase 12 migration churn.
+- **Resume at:** Phase 12, item 1 — `User : IdentityUser` (+`Plan`,`SyncOn`);
+  `MagicLinkToken` entity + repo.
 
 ### 2026-06-19 — Phase 10.2 complete (editor layout + levels)
 - **Props always below:** `LayoutEditor` body is now always `flex-col` (no
