@@ -50,8 +50,10 @@ const router = createRouter({
 
 router.beforeEach((to) => {
     const session = useSessionStore();
-    const requiresAuth =
-        import.meta.env.VITE_DISABLE_AUTH !== 'true' && to.meta.requiresAuth !== false;
+    // The dev-only auth bypass must never apply to a production build: import.meta.env.DEV
+    // is statically false under `vite build`, so the bypass branch is dead-code-eliminated.
+    const authDisabled = import.meta.env.DEV && import.meta.env.VITE_DISABLE_AUTH === 'true';
+    const requiresAuth = !authDisabled && to.meta.requiresAuth !== false;
     // Pages an authenticated user should be bounced away from, straight to their spaces.
     const guestOnly = ['login', 'landing'].includes(to.name as string);
 
