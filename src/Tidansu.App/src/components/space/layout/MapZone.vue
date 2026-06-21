@@ -15,7 +15,7 @@
             <div
                 v-for="band in bands"
                 :key="band.key"
-                :class="band.labeled ? 'rounded-ctrl border border-border-faint bg-surface-2 p-1.5' : ''"
+                :class="band.bandClass"
             >
                 <span
                     v-if="band.tag"
@@ -80,6 +80,8 @@
         return `${levels.value > 1 ? `${levels.value}L · ` : ''}${total.value}`;
     });
 
+    const LABELED_BAND_CLASS = 'rounded-ctrl border border-border-faint bg-surface-2 p-1.5';
+
     // bands: depth split for shelves with depth; single band otherwise. Levels are
     // aggregated (they stack vertically — invisible from the top).
     const bands = computed(() => {
@@ -91,6 +93,7 @@
                 depth: (key ?? 'front') as ItemDepth,
                 tag: key ? (key === 'back' ? 'Back' : 'Front') : '',
                 labeled: key !== null,
+                bandClass: key !== null ? LABELED_BAND_CLASS : '',
                 items,
                 empty: items.length === 0,
             };
