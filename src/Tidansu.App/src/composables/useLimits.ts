@@ -14,6 +14,14 @@ export type { PaywallReason };
  */
 const paywallReason = ref<PaywallReason | null>(null);
 
+/** Open the shared paywall with a reason (also usable outside component setup). */
+export function openPaywall(reason: PaywallReason): void {
+    paywallReason.value = reason;
+}
+export function closePaywall(): void {
+    paywallReason.value = null;
+}
+
 /**
  * Plan-limit gate. Exposes pre-mutate checks that return the blocking paywall
  * `reason` (or `null` when the action is allowed) plus the shared paywall state.
@@ -25,13 +33,6 @@ export function useLimits() {
     const spaces = useSpacesStore();
 
     const isPaywallOpen = computed(() => paywallReason.value !== null);
-
-    function openPaywall(reason: PaywallReason): void {
-        paywallReason.value = reason;
-    }
-    function closePaywall(): void {
-        paywallReason.value = null;
-    }
 
     // ---- pre-mutate checks: return the blocking reason, or null when allowed ----
 

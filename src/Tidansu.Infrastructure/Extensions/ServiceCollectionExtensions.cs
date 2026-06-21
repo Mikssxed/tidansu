@@ -71,7 +71,23 @@ public static class ServiceCollectionExtensions
         }
 
         services.AddScoped<IEmailService, EmailService>();
+        services.AddScoped<IMagicLinkEmailSender, MagicLinkEmailSender>();
+        services.AddScoped<IUserService, UserService>();
+
+        // Billing seam: Stripe when configured, otherwise a direct plan flip (dev/default).
+        services.Configure<StripeSettings>(configuration.GetSection("StripeSettings"));
+        var stripeSettings = configuration.GetSection("StripeSettings").Get<StripeSettings>();
+        if (stripeSettings?.IsConfigured == true)
+        {
+            services.AddScoped<IBillingService, StripeBillingService>();
+        }
+        else
+        {
+            services.AddScoped<IBillingService, DirectBillingService>();
+        }
 
         services.AddScoped<IRefreshTokensRepository, RefreshTokensRepository>();
+        services.AddScoped<IMagicLinkTokensRepository, MagicLinkTokensRepository>();
+        services.AddScoped<ISpacesRepository, SpacesRepository>();
     }
 }

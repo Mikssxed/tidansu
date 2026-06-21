@@ -184,6 +184,7 @@
 <script setup lang="ts">
     import { BaseBadge, BaseButton, BaseIcon } from '@/components/base';
     import UsageMeter from '@/components/spaces/UsageMeter.vue';
+    import { useAuth } from '@/composables/useAuth';
     import { useLimits } from '@/composables/useLimits';
     import { isInf } from '@/data/plans';
     import { useSessionStore } from '@/stores/useSessionStore';
@@ -194,6 +195,7 @@
     const session = useSessionStore();
     const store = useSpacesStore();
     const limits = useLimits();
+    const auth = useAuth();
     const router = useRouter();
 
     const user = computed(() => session.user);
@@ -247,7 +249,7 @@
         session.setSync(!session.syncOn);
     }
     function onSignOut() {
-        session.signOut();
+        auth.signOut();
         router.push({ name: 'login' });
     }
 </script>

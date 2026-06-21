@@ -56,7 +56,17 @@ for (const line of lines) {
     result.push(line);
 }
 
-writeFileSync(tsPath, result.join('\n'));
+// Kiota emits `getCollectionOfPrimitiveValues<string>()` but the installed
+// kiota-abstractions requires the primitive type as an argument. The generic
+// param already names the primitive, so pass it through.
+const patchedText = result
+    .join('\n')
+    .replace(
+        /getCollectionOfPrimitiveValues<(string|number|boolean)>\(\)/g,
+        'getCollectionOfPrimitiveValues<$1>("$1")'
+    );
+
+writeFileSync(tsPath, patchedText);
 
 const patched = [...requiredByInterface.entries()]
     .map(([name, fields]) => `${name}(${[...fields].join(', ')})`)

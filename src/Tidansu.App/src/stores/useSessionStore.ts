@@ -1,6 +1,6 @@
+import { useAccountApi } from '@/composables/useAccountApi';
 import { type PlanDef, planOf } from '@/data/plans';
 import type { Plan } from '@/data/types';
-import { useSpacesStore } from '@/stores/useSpacesStore';
 import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 
@@ -31,22 +31,14 @@ function load(): PersistedSession {
     return { user: null, syncOn: false };
 }
 
-/** "alex.smith@x.com" -> "Alex Smith" (name derived from the email local-part). */
-function nameFromEmail(email: string): string {
-    const local = email.split('@')[0] ?? '';
-    const words = local
-        .split(/[._\-+]+/)
-        .filter(Boolean)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1));
-    return words.join(' ') || 'There';
-}
-
 /**
- * Mock session for the frontend-first build. Magic-link sign-in derives the user
- * from the email, defaults to the Free plan, and seeds a starter space on first
- * login. Phases 11–12 replace this with the real JWT-backed magic-link flow.
+ * Holds the signed-in user's profile/plan/sync. Populated from the backend's
+ * magic-link `AuthResponse` (see `useAuth`); the JWT itself lives in
+ * `useAuthStore`. Plan/sync changes persist to `/api/account`. Spaces hydrate
+ * separately in `useSpacesStore` after sign-in.
  */
 export const useSessionStore = defineStore('session', () => {
+    const account = useAccountApi();
     const persisted = load();
     const user = ref<SessionUser | null>(persisted.user);
     const syncOn = ref<boolean>(persisted.syncOn);
@@ -67,22 +59,42 @@ export const useSessionStore = defineStore('session', () => {
     /** Current plan's caps/features (spaces, zones, items, photos, sync, ...). */
     const caps = computed<PlanDef>(() => planOf(plan.value));
 
-    /** Sign in (or create) via the magic link; seeds a starter space on first login. */
-    function signIn(email: string): void {
-        user.value = { name: nameFromEmail(email), email, plan: 'free' };
-        useSpacesStore().seedStarterIfEmpty();
+    /** Apply the authenticated user from the backend (spaces hydrate separately). */
+    function setUser(next: SessionUser, sync: boolean): void {
+        user.value = { name: next.name, email: next.email, plan: next.plan };
+        syncOn.value = sync;
     }
 
     function signOut(): void {
         user.value = null;
+        syncOn.value = false;
     }
 
+    /**
+     * Optimistically set the plan and persist it. When billing returns a checkout
+     * URL (Stripe upgrade), revert the optimistic flip and redirect — the webhook
+     * applies Pro after payment. In direct/dev mode there is no URL and the flip stands.
+     */
     function setPlan(next: Plan): void {
-        if (user.value) user.value.plan = next;
+        if (!user.value) return;
+        const previous = user.value.plan;
+        user.value.plan = next;
+        account
+            .changePlan(next)
+            .then((res) => {
+                const checkoutUrl = res?.data?.checkoutUrl;
+                if (checkoutUrl) {
+                    if (user.value) user.value.plan = previous;
+                    window.location.href = checkoutUrl;
+                }
+            })
+            .catch((e) => console.error('[session] plan change failed', e));
     }
 
+    /** Optimistically set sync and persist it (the caller pre-checks the Pro gate). */
     function setSync(on: boolean): void {
         syncOn.value = on;
+        void account.setSync(on).catch((e) => console.error('[session] sync change failed', e));
     }
 
     return {
@@ -92,7 +104,7 @@ export const useSessionStore = defineStore('session', () => {
         plan,
         isPro,
         caps,
-        signIn,
+        setUser,
         signOut,
         setPlan,
         setSync,

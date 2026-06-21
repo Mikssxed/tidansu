@@ -48,6 +48,24 @@ public class ErrorHandlingMiddleware(ILogger<ErrorHandlingMiddleware> logger) : 
             await context.Response.WriteAsJsonAsync(errorResponse);
             logger.LogWarning(ex.Message);
         }
+        catch (PlanLimitException ex)
+        {
+            // 403 with the paywall reason so the client can open the matching paywall.
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            context.Response.ContentType = "application/json";
+
+            var errorResponse = new ApiOperationResult
+            {
+                IsSuccess = false,
+                Errors = new Dictionary<string, string[]>
+                {
+                    { "plan", new[] { ex.Reason } }
+                }
+            };
+
+            await context.Response.WriteAsJsonAsync(errorResponse);
+            logger.LogInformation("Plan limit hit: {Reason}", ex.Reason);
+        }
         catch (ForbidException)
         {
             context.Response.StatusCode = StatusCodes.Status403Forbidden;

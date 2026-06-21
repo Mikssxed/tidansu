@@ -7,6 +7,72 @@ Kiota + PrimeVue-unstyled + Tailwind v4 frontend).
 
 ## Status
 
+Phase 14 **complete** — and with it **all 14 phases are done**. Plan change now
+routes through an `IBillingService` seam: the default `DirectBillingService` flips
+the plan immediately (the shipped "flag-now" behaviour), while a config-gated
+`StripeBillingService` (Stripe.net) creates a Checkout session on upgrade and
+applies Pro from a `POST /api/billing/webhook` event — off by default, built but
+not key-tested. `ChangePlan` returns `{ account, checkoutUrl? }`; the frontend
+`setPlan` redirects to checkout when a URL comes back (none in direct mode).
+**Verified** (direct mode): plan→pro returns `checkoutUrl:null` and persists,
+plan→free works, webhook endpoint returns 200. `dotnet build` + `npm run build`
+green. **The build is finished** — full-stack Tidansu (landing/auth/spaces/onboarding/
+layout-editor/plans-paywall/pricing/account) on .NET 10 + Vue 3 with real magic-link
+auth, server-persisted spaces/zones/items + plan limits, and a Stripe-ready billing
+seam.
+
+Phase 13 **complete** — spaces/zones/items persistence + account endpoints +
+frontend swapped to the live API. Item 3: Kiota regenerated (spaces + account
+endpoints; `fix-generated.mjs` now also fixes Kiota's `getCollectionOfPrimitiveValues`
+arity); `api/spaceMapping.ts` (DTO↔`Space`), `useSpacesApi`/`useAccountApi`,
+shared `queryClient`. `useSpacesStore` rewritten **API-backed** (hydrate from
+`GET /api/spaces` via `fetchQuery`; optimistic mutate + persist: immediate
+POST/DELETE, debounced whole-space PUT; seeds the starter fridge server-side when
+empty; `reset()` on sign-out) with **identical action signatures/getters** so views
+are untouched; `useSessionStore` plan/sync persist to `/api/account`; `useAuth`
+hydrates on sign-in + resets on sign-out; `App.vue` re-hydrates on reload; server
+403 `{plan:[reason]}` opens the paywall + re-syncs. **Browser-verified** the
+decisive case: add an item → wipe **all** localStorage → re-login → the item
+reappears (server-sourced; `hasSpacesCache:false`), sign-out clears tokens, zero
+console errors. `dotnet build` + `npm run build` green. **Next:** Phase 14 —
+Stripe-ready billing (deferred).
+
+Phase 13 **in progress** — item 1 **complete**: spaces/zones/items persistence.
+Domain `Space`/`Zone`/`Item` (ids = client uids; union fields stored as lowercase
+strings; `Zone.Rect*` as nullable doubles; `ColumnLabels`/`Tags` as JSON primitive
+collections), `Domain/Constants/PlanLimits` + `PlanLimitException`, `ISpacesRepository`
+(+ `ReplaceAsync` delete-then-insert graph swap). Application `Spaces` feature —
+`SpaceDto`/`ZoneDto`/`ItemDto`/`RectDto` (static From/ToEntity), `GetSpaces`/`GetSpace`
+queries, `CreateSpace`/`UpdateSpace`/`DeleteSpace` commands (+ validators).
+**Server-side limits**: create checks space-count + zones/items/photos caps; update
+applies the downgrade rule (reject a mutation that pushes a capped dimension
+*higher* once at/over cap; over-cap content stays editable). `SpacesController`
+(`GET`/`GET{id}`/`POST`/`PUT{id}`/`DELETE{id}`, `[Authorize]`); `PlanLimitException`
+→ 403 `{plan:[reason]}`. Migration `SpacesZonesItems` applied. **Verified** via API
+with a real JWT: create persists the graph, 3rd space→403 `spaces`, update→7 zones
+→403 `zones`, add photo on Free→403 `photos`, legit replace-graph update→200,
+delete→204, no-token→401. `dotnet build` green. **Next:** Phase 13, item 2 —
+account/usage + plan-change (pro/free) + sync endpoints.
+
+Phase 12 **complete** — real magic-link auth, front to back. Item 1: `User`
+carries `DisplayName`/`Plan` enum/`SyncOn`; `MagicLinkToken` entity + repo;
+migration `UserPlanAndMagicLinkTokens` applied. Item 2: Application `Auth` feature
+(`RequestMagicLink`/`ConsumeMagicLink`/`RefreshToken` + validators +
+`AuthResponse`/`AuthUserDto`), Domain `IUserService`/`IMagicLinkEmailSender`,
+Infrastructure `UserService` + `MagicLinkEmailSender`, anonymous `AuthController`
+(`POST /api/auth/{magic-link,consume,refresh}`, magic-link+consume rate-limited),
+verified end-to-end. Item 3: Kiota regenerated (typed `[ProducesResponseType<T>]`
+so responses aren't `ArrayBuffer`); frontend `useAuthStore` (JWT persistence),
+`useApiClient` (Kiota + Bearer provider, same-origin base URL), `useAuth`
+(requestMagicLink/consume/refresh/signOut); `useSessionStore.signIn`→`setUser`
+(server-fed user); `LoginView` drives the real flow incl. the `?token=…` callback;
+`AccountView` sign-out clears tokens. **Browser-verified** (Chromium, both servers
+up): full sign-in stores access+refresh + server-derived "Verify User", honours
+`returnUrl=/account`, seeds "My fridge", persists across reload, sign-out clears
+all; zero console errors. `dotnet build` + `npm run build` green. **Next:**
+Phase 13, item 1 — `Space`/`Zone`/`Item` domain + repos + CQRS CRUD with
+server-side limit enforcement.
+
 Phase 11 **complete** — backend foundation: the .NET solution now has a working
 Clean-Architecture backbone. **Domain** (`User : IdentityUser`, `RefreshToken`,
 `IJwtService`/`IEmailService`, four domain exceptions, `IRefreshTokensRepository`);
@@ -266,25 +332,263 @@ More user feedback after 10.1. _(ref: user feedback 2026-06-19.)_
   migration. _(ref: SelfGrind backend, CLAUDE.md)_
 
 ### Phase 12 — Real magic-link auth + user/plan persistence
-- [ ] `User : IdentityUser` (+`Plan`,`SyncOn`); `MagicLinkToken` entity + repo. _(ref: handoff auth/plans)_
-- [ ] CQRS `RequestMagicLink` (issue + email one-time token) and `ConsumeMagicLink`
+- [x] `User : IdentityUser` (+`Plan`,`SyncOn`); `MagicLinkToken` entity + repo. _(ref: handoff auth/plans)_
+- [x] CQRS `RequestMagicLink` (issue + email one-time token) and `ConsumeMagicLink`
   (validate → issue JWT/refresh, create user if new, derive name, seed starter
-  space); controller endpoints. _(ref: handoff auth, EmailService)_
-- [ ] Regenerate Kiota; replace mocked frontend auth with real calls (keep
-  `returnUrl` + refresh flow). _(ref: useApiClient, tokenRefresh)_
+  space); controller endpoints. _(ref: handoff auth, EmailService)_ _(also added
+  `RefreshToken` rotation for item 3's refresh flow; server-side starter-space
+  seeding deferred to Phase 13 — no `Space` entity yet, frontend keeps
+  `seedStarterIfEmpty`.)_
+- [x] Regenerate Kiota; replace mocked frontend auth with real calls (keep
+  `returnUrl` + refresh flow). _(ref: useApiClient, tokenRefresh)_ _(automatic
+  401-retry interception deferred to Phase 13 — no protected endpoint to exercise
+  it yet; `useAuth.refresh` + backend rotation are in place and verified.)_
 
 ### Phase 13 — Spaces / zones / items persistence
-- [ ] Domain `Space`/`Zone`/`Item` + repos; CQRS CRUD for spaces/zones/items with
+- [x] Domain `Space`/`Zone`/`Item` + repos; CQRS CRUD for spaces/zones/items with
   **server-side limit enforcement** + downgrade read-only-over-cap rule. _(ref: handoff business rules)_
-- [ ] Account/usage + plan-change (pro/free) + sync endpoints. _(ref: handoff account)_
-- [ ] Regenerate Kiota; swap Pinia local stores to TanStack-Query-over-API (store
-  shapes preserved). _(ref: CLAUDE.md frontend)_
+  _(whole-space persistence keyed by client uids — zone/item CRUD collapses into
+  space create/update, preserving all client geometry/parse logic; limits enforced
+  in handlers via `PlanLimits`, over-cap rejected with `PlanLimitException`→403
+  `{plan:[reason]}`.)_
+- [x] Account/usage + plan-change (pro/free) + sync endpoints. _(ref: handoff account)_
+  _(`AccountController`: GET `/api/account` (profile+plan+sync+aggregate usage),
+  PUT `/api/account/plan`, PUT `/api/account/sync` (Pro-gated → 403 `plan:sync`).)_
+- [x] Regenerate Kiota; swap Pinia local stores to TanStack-Query-over-API (store
+  shapes preserved). _(ref: CLAUDE.md frontend)_ _(spaces store hydrates from
+  `GET /api/spaces` via the shared QueryClient, mutates optimistically + persists
+  (immediate create/delete, debounced whole-space PUT); session plan/sync persist
+  to `/api/account`; server 403 `{plan:[reason]}` opens the paywall + re-syncs.)_
 
 ### Phase 14 — Stripe-ready billing (deferred)
-- [ ] Put plan change behind a `BillingService` seam; add Stripe checkout +
-  webhook → set plan. _(ref: handoff pricing behavior)_
+- [x] Put plan change behind a `BillingService` seam; add Stripe checkout +
+  webhook → set plan. _(ref: handoff pricing behavior)_ _(`IBillingService` seam;
+  `ChangePlan` routes through it returning an optional `checkoutUrl`. Default
+  `DirectBillingService` flips the plan; config-gated `StripeBillingService`
+  (checkout session + webhook→Pro) + `POST /api/billing/webhook`. Stripe off by
+  default — built, not key-tested. Frontend `setPlan` redirects when a `checkoutUrl`
+  is returned.)_
 
 ## Progress log
+
+### 2026-06-21 — Phase 14 (Stripe-ready billing seam) — BUILD COMPLETE
+- **Domain:** `Interfaces/IBillingService.cs` (`ChangePlanAsync` → `BillingChangeResult`
+  {`CheckoutUrl?`}; `HandleWebhookAsync`). 
+- **Application:** `ChangePlanCommand` now returns `ChangePlanResult` {`Account`,
+  `CheckoutUrl?`}; handler delegates the plan change to `IBillingService` then
+  composes the account/usage response. `Billing/Commands/HandleStripeWebhook`
+  (command + handler → `IBillingService.HandleWebhookAsync`).
+- **Infrastructure:** added `Stripe.net` 52.0.0. `StripeSettings` (Enabled +
+  keys/price/urls; `IsConfigured`). `DirectBillingService` (default — flips plan via
+  `IUserService`, webhook no-op). `StripeBillingService` (upgrade → Checkout session
+  → `Redirect(url)`; downgrade → flip Free; webhook `ConstructEvent` signature-verified,
+  `checkout.session.completed`→Pro via `ClientReferenceId`; bad signature →
+  `ValidationException`→400; Domain `Plan` aliased past `Stripe.Plan`).
+  `AddInfrastructure` registers Stripe when `IsConfigured`, else Direct.
+- **API:** `BillingController` `POST /api/billing/webhook` (`[AllowAnonymous]`, reads
+  raw body + `Stripe-Signature`). `AccountController.ChangePlan` returns
+  `ChangePlanResult`. `appsettings.Development.json` gains `StripeSettings`
+  (`Enabled:false`).
+- **Frontend:** Kiota regenerated (`ChangePlanResult`, `/api/billing/webhook`).
+  `useSessionStore.setPlan` optimistically flips, and on a returned `checkoutUrl`
+  reverts + `window.location.href = checkoutUrl` (Stripe upgrade) — null in direct
+  mode so the flip stands.
+- **Verified** (API:5081 + Node, direct mode): plan→pro returns
+  `{account.plan:"pro", checkoutUrl:null}` and persists (GET account → pro);
+  plan→free works; `POST /api/billing/webhook` → 200 (direct no-op). `dotnet build`
+  + `npm run build` green.
+- **Deviation:** Stripe path is built but config-gated off (no keys to run against);
+  subscription-cancellation on downgrade + customer↔user mapping for
+  `subscription.deleted` left as TODOs in `StripeBillingService`.
+- **Milestone:** Phases 1–14 complete.
+
+### 2026-06-21 — Phase 13 item 3 (frontend swapped to live API) — PHASE 13 DONE
+- **Kiota:** regenerated against the updated spec (now `/api/spaces[/{id}]` +
+  `/api/account[/plan|sync]`). Fixed a generator/runtime skew durably in
+  `fix-generated.mjs` — it now rewrites `getCollectionOfPrimitiveValues<T>()` →
+  `…<T>("T")` (the installed kiota-abstractions requires the primitive-type arg);
+  affected `tags`/`columnLabels`.
+- **New frontend infra:** `api/spaceMapping.ts` (`toSpace`/`toDtoBody`; normalises
+  the `rect` nullability gap — generated `ZoneDto.rect` is non-null but the server
+  round-trips null for columns zones), `composables/useSpacesApi.ts` (list/create/
+  update/remove + `planReasonOf` pulling the 403 `{plan:[reason]}` off the thrown
+  error's `additionalData`), `composables/useAccountApi.ts`, shared
+  `queryClient.ts` (installed via `VueQueryPlugin({queryClient})`).
+- **Stores (shapes preserved):** `useSpacesStore` is now server-backed —
+  `hydrate(force)` loads via `queryClient.fetchQuery(['spaces'])` and seeds the
+  starter fridge server-side when empty; every mutation updates local state then
+  persists (create/delete immediately; rename/items/zones/viewMode via a 400 ms
+  debounced whole-space PUT); `reset()` clears local + query cache on sign-out.
+  All action names/returns and getters unchanged → views untouched. Dropped the
+  localStorage `tidansu_spaces` cache + `seedStarterIfEmpty`. `useSessionStore`
+  `setPlan`/`setSync` persist optimistically to `/api/account`.
+- **Wiring:** `useAuth.consume` awaits `spaces.hydrate(true)` before navigating and
+  `signOut` calls `spaces.reset()`; `App.vue` `onMounted` re-hydrates when
+  `auth.hasTokens` (reload); `useLimits` exposes module-level `openPaywall`/
+  `closePaywall` so the store opens the paywall on a server cap.
+- **Verified** (Chromium `verify-persist.mjs`, gitignored; API:5081 + vite:5173):
+  fresh sign-in seeds "My fridge" server-side; smart-add "Persisted apple"; then
+  **localStorage fully cleared** + re-login → the item still shows (server-sourced),
+  `hasSpacesCache:false`; sign-out clears the token. Zero console errors.
+  `dotnet build` + `npm run build` green.
+- **Deviation:** auto 401-retry/refresh interception still deferred (the store logs
+  sync errors; `useAuth.refresh` exists). TanStack Query backs the read path
+  (`fetchQuery`/cache) while the Pinia store remains the reactive source the views
+  mutate — the pragmatic shape-preserving integration.
+- **Resume at:** Phase 14 — Stripe-ready billing behind a `BillingService` seam.
+
+### 2026-06-21 — Phase 13 item 2 (account / usage / plan / sync endpoints)
+- **Application `Account/`:** `Dtos/AccountDto.cs` (`From(user, usage)`; plan as
+  lowercase) + `Dtos/UsageDto.cs` (`From(spaces)` → spaces/items/fullestSpace).
+  `Queries/GetAccount`; `Commands/ChangePlan` (validator restricts to free/pro;
+  persists `User.Plan`; downgrade keeps data — over-cap goes read-only on next
+  `UpdateSpace`) and `Commands/SetSync` (Free + syncOn → `PlanLimitException(sync)`).
+- **Infrastructure/Domain:** `IUserService.UpdateAsync` + `UserService` impl
+  (UserManager.UpdateAsync, throws `ValidationException` on failure).
+- **API:** `AccountController` (`[Authorize]`): `GET /api/account`,
+  `PUT /api/account/plan`, `PUT /api/account/sync` (typed responses). No migration
+  (Plan/SyncOn already on `User`).
+- **Verified** (API:5081 + Node, fresh user): GET account → usage 0/0/0; after a
+  3-item space → 1/3/3; PUT sync on while Free → 403 `{plan:[sync]}`; PUT plan→pro
+  → 200; PUT sync on while Pro → 200 `syncOn:true`; PUT plan→free → 200; invalid
+  plan → 400; no-token → 401. `dotnet build` green.
+- **Resume at:** Phase 13, item 3 — regenerate Kiota + swap Pinia stores to
+  TanStack-Query-over-API (store shapes preserved).
+
+### 2026-06-21 — Phase 13 item 1 (spaces/zones/items persistence + limits)
+- **Domain:** `Entities/Space.cs`/`Zone.cs`/`Item.cs` — keys are the client uids
+  (`space_…`/`zone_…`/`item_…`) so zone/item references round-trip; union fields
+  (type/viewMode/canvasMode/color/kind/facing/depth) stored as lowercase strings;
+  `Zone` rect flattened to nullable `RectX/Y/W/H`; `ColumnLabels`/`Tags` are
+  `List<string>` (EF JSON primitive collections); `Photo` nvarchar(max).
+  `Constants/PlanLimits.cs` (Free 2 spaces / 6 zones / 50 items; `IsPro`/`AllowsPhotos`)
+  + `PlanLimitReasons`; `Exceptions/PlanLimitException.cs` (carries `Reason`).
+  `Repositories/ISpacesRepository.cs` (GetAllByUser/GetById(scoped to user)/CountByUser/
+  Add/Remove/`ReplaceAsync`/SaveChanges). `IUserService` gained `FindByIdAsync`.
+- **Infrastructure:** `TidansuDbContext` Space/Zone/Item config (string keys,
+  user+children cascade FKs, `UserId` index, primitive collections);
+  `SpacesRepository` (split-query includes; `ReplaceAsync` = RemoveRange children +
+  SaveChanges, then re-attach new graph + SaveChanges, so reused ids don't collide).
+  Registered `ISpacesRepository`.
+- **Application `Spaces/`:** `Dtos` (`SpaceDto`/`ZoneDto`/`ItemDto`/`RectDto`, static
+  `FromEntity`/`ToEntity`; rect null when `RectX` null; zones ordered by position).
+  Queries `GetSpaces`/`GetSpace`; commands `CreateSpace`/`UpdateSpace`/`DeleteSpace`
+  (+ validators). Create enforces space-count + zones/items/photos caps; Update
+  enforces the **downgrade rule** (reject increases of an at/over-cap dimension;
+  existing over-cap data stays editable) then `ReplaceAsync`. Duplicate stays
+  client-side (builds a copy → CreateSpace).
+- **API:** `SpacesController` (`[Authorize]`, GET/GET{id}/POST/PUT{id}/DELETE{id},
+  typed `[ProducesResponseType<T>]`); `ErrorHandlingMiddleware` maps
+  `PlanLimitException`→403 `{ errors: { plan: [reason] } }`.
+- **Migration:** `SpacesZonesItems` (Spaces/Zones/Items tables, JSON columns) created
+  **and applied** to localdb.
+- **Verified** (API:5081 + Node, fresh user via magic-link): CREATE persists 3 zones/
+  5 items; LIST returns it; 2nd CREATE ok (cap 2); 3rd→403 `spaces`; PUT s1→7 zones
+  →403 `zones`; PUT s1 add photo→403 `photos`; legit PUT (rename + 6 items, graph
+  replaced via reused ids)→200; DELETE→204; no-token→401. `dotnet build` green.
+- **Design note:** chose whole-space persistence over per-zone/item endpoints —
+  collapses CRUD, centralises limit checks, and keeps the client's geometry/parse
+  helpers authoritative (item 3 store swap stays a thin load/save).
+- **Resume at:** Phase 13, item 2 — account/usage + plan-change (pro/free) + sync
+  endpoints.
+
+### 2026-06-21 — Phase 12 item 3 (Kiota regen + real frontend auth) — PHASE 12 DONE
+- **IDE fix (per user report):** "cannot resolve symbol Tidansu" in `Program.cs`
+  was a stale IDE index, not a build error — `dotnet restore`/`build Tidansu.sln`
+  are green; resolved by Invalidate Caches/reopen. No code change needed.
+- **Kiota typing:** initial regen produced `Promise<ArrayBuffer>` because the
+  controller's bare `[ProducesResponseType(200)]` declared no body schema. Switched
+  to generic `[ProducesResponseType<ApiOperationResult<T>>(200)]` on all three
+  actions → swagger now emits `AuthResponse`/`AuthUserDto`/`RequestMagicLinkResult`
+  + `…ApiOperationResult` wrappers; client methods return the typed result.
+- **Kiota pipeline note:** `swagger tofile` (Swashbuckle CLI) can't resolve the
+  minimal-hosting entry point ("no Startup"), so the spec was fetched from the
+  running API (`/swagger/v1/swagger.json` → `src/api/api.json`) before
+  `build:api-fix`/`build:api-client`/`build:api-patch`. (`build:api-file` step
+  still needs a host-factory fix to run unattended.)
+- **Frontend infra:** `stores/useAuthStore.ts` (access/refresh/expiresAt persisted
+  to `tidansu_auth`; `setTokens`/`clear`/`isAccessTokenValid`);
+  `composables/useApiClient.ts` (singleton `DefaultRequestAdapter` +
+  `BaseBearerTokenAuthenticationProvider` reading the access token,
+  `baseUrl=window.location.origin` so `/api` is proxied in dev / same-origin in
+  prod); `composables/useAuth.ts` (`requestMagicLink`/`consume`/`refresh`/`signOut`,
+  mapping `AuthResponse`→stores).
+- **Swaps:** `useSessionStore` lost the mocked `signIn`/`nameFromEmail`, gained
+  `setUser(user, sync)` (server-fed, still seeds the starter space); `signOut`
+  also resets `syncOn`. `LoginView` rewritten: state A sends the real link (shows
+  dev "Open the link" from `devLink`), new consuming state, `onMounted` handles the
+  `/login?token=…&returnUrl=…` callback, error copy on failure. `AccountView`
+  sign-out now routes through `useAuth.signOut` (clears tokens + session).
+- **Verified** (Chromium `verify-auth.mjs`, gitignored; API:5081 + vite:5173):
+  `{hasAccessToken, hasRefreshToken}` true, `userName:"Verify User"` (server-derived
+  from `verify.user`), `plan:"free"`, starter "My fridge" seeded, landed on
+  `/account` (returnUrl honoured); token survives reload; sign-out clears token +
+  user. API log shows magic-link 200 → consume 200 (account created). Zero console
+  errors. `dotnet build` + `npm run build` green.
+- **Deviations:** auto 401-retry interceptor deferred to Phase 13 (no protected
+  endpoint yet) — `useAuth.refresh` + backend rotation exist and are verified; the
+  generated Kiota client (`src/api/apiClient`, `api.json`) is committed.
+- **Resume at:** Phase 13, item 1 — `Space`/`Zone`/`Item` domain + repos; CQRS CRUD
+  with server-side limit enforcement + downgrade read-only-over-cap rule.
+
+### 2026-06-21 — Phase 12 item 2 (real magic-link auth + endpoints)
+- **Domain interfaces:** `IUserService` (find/create user — keeps Application free
+  of `UserManager`) and `IMagicLinkEmailSender` (build link + email + dev-link
+  return).
+- **Application `Auth/`:** `Dtos/AuthResponse.cs` (`From(user, access, refresh,
+  expiresIn)` factory; `User` aliased to dodge the `Tidansu.Application.User`
+  namespace) + `Dtos/AuthUserDto.cs` (Plan as lowercase `"free"`/`"pro"` to match
+  the frontend). Commands (triplet each): `RequestMagicLink` (→ `RequestMagicLinkResult`
+  with dev-only `DevLink`; invalidates prior active links, 15-min single-use token,
+  reuses `IJwtService` random+SHA-256), `ConsumeMagicLink` (hash-lookup → `IsActive`
+  → burn → find/create user + derive name → JWT + stored refresh), `RefreshToken`
+  (rotate: revoke presented, issue new). Validators on all three.
+- **Infrastructure:** `UserService` (UserManager; new users `EmailConfirmed=true`,
+  `Plan=Free`, throws `ValidationException` on identity failure), `MagicLinkEmailSender`
+  (FrontendUrl from config, URL-escaped token+returnUrl, inline HTML email, returns
+  the link only when `IsDevelopment()`). Both registered in `AddInfrastructure`.
+- **API:** `Controllers/AuthController.cs` — `[AllowAnonymous]` `POST
+  /api/auth/{magic-link,consume,refresh}`; magic-link + consume carry the `auth`
+  rate-limit policy. Returns `ApiOperationResult.Ok(...)`.
+- **Verified** (API on :5081, Development): swagger lists all three paths; Node
+  drove request→`devLink` (token + `returnUrl=/account` round-trip), consume→200
+  `{accessToken, refreshToken, expiresIn:3600, user{name:"Alex Smith", plan:"free",
+  syncOn:false}}`, refresh→200 rotated pair, replay of the consumed token→401,
+  old refresh after rotation→401. `dotnet build` 0 errors.
+- **Deviations:** added `RefreshToken` rotation now (needed by item 3's refresh
+  flow); server-side starter-space seeding deferred to Phase 13 (no `Space` entity
+  yet) — the frontend keeps `seedStarterIfEmpty`. Magic-link raw token reuses
+  `IJwtService.GenerateRefreshTokenAsync`/`HashRefreshToken` (generic random+SHA-256).
+- **Resume at:** Phase 12, item 3 — regenerate Kiota + swap mocked frontend auth.
+
+### 2026-06-21 — Phase 12 item 1 (User plan/sync + magic-link entity)
+- **Domain:** `Enums/Plan.cs` (`Free=0`/`Pro=1`); `User` extended with
+  `DisplayName` (derived from email local-part at first sign-in — pulled forward
+  to avoid Phase 12 migration churn), `Plan Plan = Free`, `bool SyncOn`.
+  `Entities/MagicLinkToken.cs` (Id, Email, TokenHash, CreatedAt, ExpiresAt,
+  ConsumedAt; `IsActive` = not consumed && not expired — email-keyed since the
+  link is requested before the user may exist, hash-at-rest like `RefreshToken`).
+  `Repositories/IMagicLinkTokensRepository.cs` (`AddAsync`/`GetByHashAsync`/
+  `InvalidateActiveForEmailAsync`/`SaveChangesAsync`).
+- **Infrastructure:** `Repositories/MagicLinkTokensRepository.cs`
+  (`InvalidateActiveForEmailAsync` uses `ExecuteUpdateAsync` to stamp `ConsumedAt`
+  on still-active links). `TidansuDbContext` adds the `MagicLinkTokens` DbSet
+  (unique `TokenHash` index + `Email` index, both hashes `nvarchar(64)`,
+  `Email`/`DisplayName` `nvarchar(256)`) and a `User` config (`Plan` → string via
+  `HasConversion<string>().HasMaxLength(16)`). `AddInfrastructure` registers
+  `IMagicLinkTokensRepository`.
+- **Migration:** `dotnet ef migrations add UserPlanAndMagicLinkTokens` →
+  `20260621134914_UserPlanAndMagicLinkTokens` (+snapshot); edited the generated
+  `Plan` column default from `""` to `"Free"` (table empty — auth not built yet, so
+  cosmetic). **Applied** to `(localdb)\MSSQLLocalDB` `TidansuDb`.
+- **Verified:** `dotnet build` 0 errors (10 inherited NU1903 warnings);
+  `database update` applied cleanly.
+- **Deviation:** added `DisplayName` now (plan item names only `Plan`/`SyncOn`) so
+  Phase 12 item 2's "derive name" needs no further migration; `Plan` stored as a
+  string (readable, matches the frontend `'free'|'pro'` literals) rather than int.
+- **Resume at:** Phase 12, item 2 — CQRS `RequestMagicLink` (issue + email
+  one-time token) and `ConsumeMagicLink` (validate → JWT/refresh, create user if
+  new, derive name, seed starter space) + controller endpoints.
 
 ### 2026-06-20 — Phase 11 complete (backend foundation)
 - **Domain** (`src/Tidansu.Domain`): `Entities/User.cs` (`User : IdentityUser`,

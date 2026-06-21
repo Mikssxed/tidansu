@@ -1,0 +1,40 @@
+using MediatR;
+using Microsoft.Extensions.Logging;
+using Tidansu.Application.Account.Dtos;
+using Tidansu.Application.User;
+using Tidansu.Domain.Enums;
+using Tidansu.Domain.Exceptions;
+using Tidansu.Domain.Interfaces;
+using Tidansu.Domain.Repositories;
+
+namespace Tidansu.Application.Account.Commands.ChangePlan;
+
+public class ChangePlanCommandHandler(
+    ILogger<ChangePlanCommandHandler> logger,
+    IUserService userService,
+    IBillingService billing,
+    ISpacesRepository spaces,
+    IUserContext userContext) : IRequestHandler<ChangePlanCommand, ChangePlanResult>
+{
+    public async Task<ChangePlanResult> Handle(ChangePlanCommand request, CancellationToken cancellationToken)
+    {
+        var userId = userContext.GetCurrentUser().Id;
+        var user = await userService.FindByIdAsync(userId, cancellationToken)
+            ?? throw new AuthenticationException("user not found");
+
+        var target = request.Plan == "pro" ? Plan.Pro : Plan.Free;
+
+        // The billing seam decides whether this applies now or needs a checkout
+        // redirect (Stripe upgrade). Downgrade keeps all data — over-cap content
+        // just becomes read-only on the next UpdateSpace.
+        logger.LogInformation("Plan change requested for user {UserId}: {From} → {To}", userId, user.Plan, target);
+        var result = await billing.ChangePlanAsync(user, target, cancellationToken);
+
+        var userSpaces = await spaces.GetAllByUserAsync(userId, cancellationToken);
+        return new ChangePlanResult
+        {
+            Account = AccountDto.From(user, UsageDto.From(userSpaces)),
+            CheckoutUrl = result.CheckoutUrl,
+        };
+    }
+}

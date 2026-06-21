@@ -7,6 +7,8 @@ namespace Tidansu.Infrastructure.Persistence;
 public class TidansuDbContext(DbContextOptions<TidansuDbContext> options) : IdentityDbContext<User>(options)
 {
     public DbSet<RefreshToken> RefreshTokens { get; set; }
+    public DbSet<MagicLinkToken> MagicLinkTokens { get; set; }
+    public DbSet<Space> Spaces { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -21,6 +23,70 @@ public class TidansuDbContext(DbContextOptions<TidansuDbContext> options) : Iden
                 .WithMany(u => u.RefreshTokens)
                 .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<MagicLinkToken>(token =>
+        {
+            token.Property(t => t.Email).HasMaxLength(256);
+            token.Property(t => t.TokenHash).HasMaxLength(64);
+            token.HasIndex(t => t.TokenHash).IsUnique();
+            token.HasIndex(t => t.Email);
+        });
+
+        modelBuilder.Entity<User>(user =>
+        {
+            user.Property(u => u.DisplayName).HasMaxLength(256);
+            user.Property(u => u.Plan).HasConversion<string>().HasMaxLength(16);
+        });
+
+        modelBuilder.Entity<Space>(space =>
+        {
+            space.Property(s => s.Id).HasMaxLength(64);
+            space.Property(s => s.Name).HasMaxLength(120);
+            space.Property(s => s.Type).HasMaxLength(16);
+            space.Property(s => s.ViewMode).HasMaxLength(16);
+            space.Property(s => s.CanvasMode).HasMaxLength(16);
+            // string[]? → JSON column (EF primitive collection).
+            space.PrimitiveCollection(s => s.ColumnLabels);
+
+            space.HasOne(s => s.User)
+                .WithMany()
+                .HasForeignKey(s => s.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            space.HasIndex(s => s.UserId);
+
+            space.HasMany(s => s.Zones)
+                .WithOne()
+                .HasForeignKey(z => z.SpaceId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            space.HasMany(s => s.Items)
+                .WithOne()
+                .HasForeignKey(i => i.SpaceId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<Zone>(zone =>
+        {
+            zone.Property(z => z.Id).HasMaxLength(64);
+            zone.Property(z => z.Label).HasMaxLength(120);
+            zone.Property(z => z.Color).HasMaxLength(16);
+            zone.Property(z => z.Kind).HasMaxLength(16);
+            zone.Property(z => z.Facing).HasMaxLength(16);
+        });
+
+        modelBuilder.Entity<Item>(item =>
+        {
+            item.Property(i => i.Id).HasMaxLength(64);
+            item.Property(i => i.Name).HasMaxLength(200);
+            item.Property(i => i.ZoneId).HasMaxLength(64);
+            item.Property(i => i.DateAdded).HasMaxLength(40);
+            item.Property(i => i.Expiry).HasMaxLength(40);
+            item.Property(i => i.Depth).HasMaxLength(16);
+            item.Property(i => i.Icon).HasMaxLength(40);
+            item.PrimitiveCollection(i => i.Tags);
+            // Photos may be data URLs — leave Photo as nvarchar(max) (default for string).
         });
     }
 }
