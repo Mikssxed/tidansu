@@ -140,6 +140,7 @@
 <script setup lang="ts">
     import { BaseButton, BaseCard, BaseIcon } from '@/components/base';
     import { useAuth } from '@/composables/useAuth';
+    import { safeReturnUrl } from '@/utils/returnUrl';
     import { computed, onMounted, ref } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
 
@@ -160,10 +161,7 @@
     const sendDisabled = computed(() => !emailValid.value || sending.value);
     const sendLabel = computed(() => (sending.value ? 'Sending…' : 'Send magic link'));
 
-    const returnUrl = computed(() => {
-        const value = route.query.returnUrl;
-        return typeof value === 'string' ? value : undefined;
-    });
+    const returnUrl = computed(() => safeReturnUrl(route.query.returnUrl));
 
     async function sendLink() {
         if (!emailValid.value || sending.value) return;
@@ -196,7 +194,7 @@
         if (!devLink.value) return;
         const url = new URL(devLink.value);
         const token = url.searchParams.get('token');
-        const target = url.searchParams.get('returnUrl') ?? undefined;
+        const target = safeReturnUrl(url.searchParams.get('returnUrl'));
         if (token) void consumeToken(token, target);
     }
 
