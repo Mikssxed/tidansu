@@ -25,7 +25,10 @@ public class UpdateSpaceCommandHandler(
             ?? throw new AuthenticationException("user not found");
 
         var dto = request.Space;
-        EnforceLimits(user.Plan, existing, dto);
+        var before = new SpaceUsage(existing.Zones.Count, existing.Items.Count, existing.Items.Count(i => i.Photo is not null));
+        var after = new SpaceUsage(dto.Zones.Count, dto.Items.Count, dto.Items.Count(i => i.Photo is not null));
+        if (PlanPolicy.CheckSpaceMutation(user.Plan, before, after) is { } reason)
+            throw new PlanLimitException(reason);
 
         // Scalar fields (existing is tracked → persisted by ReplaceAsync).
         existing.Name = dto.Name;
@@ -42,25 +45,5 @@ public class UpdateSpaceCommandHandler(
         await spaces.ReplaceAsync(existing, zones, items, cancellationToken);
 
         return SpaceDto.FromEntity(existing);
-    }
-
-    // Downgrade rule: over-cap content stays editable, but a mutation may not push a
-    // capped dimension *higher* once it's at/over the cap.
-    private static void EnforceLimits(Domain.Enums.Plan plan, Domain.Entities.Space existing, SpaceDto dto)
-    {
-        if (PlanLimits.IsPro(plan)) return;
-
-        var newZones = dto.Zones.Count;
-        if (newZones > PlanLimits.FreeZonesPerSpace && newZones > existing.Zones.Count)
-            throw new PlanLimitException(PlanLimitReasons.Zones);
-
-        var newItems = dto.Items.Count;
-        if (newItems > PlanLimits.FreeItemsPerSpace && newItems > existing.Items.Count)
-            throw new PlanLimitException(PlanLimitReasons.Items);
-
-        var newPhotos = dto.Items.Count(i => i.Photo is not null);
-        var oldPhotos = existing.Items.Count(i => i.Photo is not null);
-        if (!PlanLimits.AllowsPhotos(plan) && newPhotos > oldPhotos)
-            throw new PlanLimitException(PlanLimitReasons.Photos);
     }
 }

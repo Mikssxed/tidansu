@@ -21,8 +21,8 @@ public class SetSyncCommandHandler(
         var user = await userService.FindByIdAsync(userId, cancellationToken)
             ?? throw new AuthenticationException("user not found");
 
-        // Sync is a Pro feature — turning it on requires Pro.
-        if (request.SyncOn && !PlanLimits.IsPro(user.Plan))
+        // Sync is a Pro capability — turning it on requires the plan's sync gate.
+        if (request.SyncOn && !PlanCaps.For(user.Plan).Sync)
         {
             throw new PlanLimitException(PlanLimitReasons.Sync);
         }

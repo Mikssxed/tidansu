@@ -406,6 +406,35 @@
         }
       }
     },
+    "/api/plans": {
+      "get": {
+        "tags": [
+          "Plans"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCapsDtoListApiOperationResult"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCapsDtoListApiOperationResult"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCapsDtoListApiOperationResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/spaces": {
       "get": {
         "tags": [
@@ -996,6 +1025,70 @@
           "zoneId"
         ]
       },
+      "PlanCapsDto": {
+        "type": "object",
+        "properties": {
+          "plan": {
+            "type": "string"
+          },
+          "spaces": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "zones": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "items": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "photos": {
+            "type": "boolean"
+          },
+          "sync": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "photos",
+          "plan",
+          "sync"
+        ]
+      },
+      "PlanCapsDtoListApiOperationResult": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "isSuccess": {
+            "type": "boolean"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlanCapsDto"
+            },
+            "nullable": true
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "errors",
+          "isSuccess"
+        ]
+      },
       "ProblemDetails": {
         "type": "object",
         "properties": {
@@ -1346,6 +1439,9 @@
     },
     {
       "name": "Billing"
+    },
+    {
+      "name": "Plans"
     },
     {
       "name": "Spaces"

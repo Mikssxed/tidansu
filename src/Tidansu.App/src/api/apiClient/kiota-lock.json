@@ -1,8 +1,8 @@
 {
-  "descriptionHash": "EDA56C6A540EBA21A1CA484C32049E1356962A3A308DED0A19D7CC9A4C4758643558DF06D25121C50C46CF332B9B3956F5A29930E851F4FCD8CE96CC592B459C",
+  "descriptionHash": "3E0F8183F6CF254168640F7B40D6378C3EA14EA3B8BCC5BF78DC8AF3AF87305BEA3CF5B0250045F5106E42A486C5540C06F7A3322BB01BBB3195375CCD9CAF18",
   "descriptionLocation": "../api.json",
   "lockFileVersion": "1.0.0",
-  "kiotaVersion": "1.30.0",
+  "kiotaVersion": "1.32.5",
   "clientClassName": "apiClient",
   "typeAccessModifier": "Public",
   "clientNamespaceName": "ApiSdk",
@@ -30,5 +30,6 @@
   ],
   "includePatterns": [],
   "excludePatterns": [],
-  "disabledValidationRules": []
+  "disabledValidationRules": [],
+  "allowedExternalOrigins": []
 }

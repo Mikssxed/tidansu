@@ -8,6 +8,8 @@ import { AuthRequestBuilderNavigationMetadata, type AuthRequestBuilder } from '.
 // @ts-ignore
 import { BillingRequestBuilderNavigationMetadata, type BillingRequestBuilder } from './billing/index.js';
 // @ts-ignore
+import { PlansRequestBuilderRequestsMetadata, type PlansRequestBuilder } from './plans/index.js';
+// @ts-ignore
 import { SpacesRequestBuilderNavigationMetadata, SpacesRequestBuilderRequestsMetadata, type SpacesRequestBuilder } from './spaces/index.js';
 // @ts-ignore
 import { type BaseRequestBuilder, type KeysToExcludeForNavigationMetadata, type NavigationMetadata } from '@microsoft/kiota-abstractions';
@@ -28,6 +30,10 @@ export interface ApiRequestBuilder extends BaseRequestBuilder<ApiRequestBuilder>
      * The billing property
      */
     get billing(): BillingRequestBuilder;
+    /**
+     * The plans property
+     */
+    get plans(): PlansRequestBuilder;
     /**
      * The spaces property
      */
@@ -50,6 +56,9 @@ export const ApiRequestBuilderNavigationMetadata: Record<Exclude<keyof ApiReques
     },
     billing: {
         navigationMetadata: BillingRequestBuilderNavigationMetadata,
+    },
+    plans: {
+        requestsMetadata: PlansRequestBuilderRequestsMetadata,
     },
     spaces: {
         requestsMetadata: SpacesRequestBuilderRequestsMetadata,

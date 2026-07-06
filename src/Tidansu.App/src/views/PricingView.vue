@@ -114,7 +114,7 @@
 <script setup lang="ts">
     import { BaseIcon } from '@/components/base';
     import PlanCard from '@/components/pricing/PlanCard.vue';
-    import { PLAN_FEATURES, PLANS } from '@/data/plans';
+    import { PLAN_FEATURES, planOf } from '@/data/plans';
     import type { Plan } from '@/data/types';
     import { useSessionStore } from '@/stores/useSessionStore';
     import { computed, ref } from 'vue';
@@ -125,8 +125,8 @@
 
     const billing = ref<'month' | 'year'>('year');
 
-    const freePlan = PLANS.free;
-    const proPlan = PLANS.pro;
+    const freePlan = computed(() => planOf('free'));
+    const proPlan = computed(() => planOf('pro'));
     const currentPlan = computed<Plan>(() => session.plan);
 
     const monthClass = computed(() =>
@@ -138,13 +138,13 @@
 
     const comparison = computed(() =>
         PLAN_FEATURES.map((f) => {
-            const freeValue = PLANS.free[f.key];
+            const freeValue = freePlan.value[f.key];
             return {
                 key: f.key,
                 label: f.label,
                 freeValue: f.fmt(freeValue),
                 freeClass: freeValue === false ? 'text-text-3' : 'text-text-2',
-                proValue: f.fmt(PLANS.pro[f.key]),
+                proValue: f.fmt(proPlan.value[f.key]),
             };
         })
     );

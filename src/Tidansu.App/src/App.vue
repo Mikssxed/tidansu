@@ -2,6 +2,7 @@
     import AppLayout from '@/components/layout/AppLayout.vue';
     import PlainLayout from '@/components/layout/PlainLayout.vue';
     import PaywallModal from '@/components/paywall/PaywallModal.vue';
+    import { usePlanCaps } from '@/composables/usePlanCaps';
     import { useAuthStore } from '@/stores/useAuthStore';
     import { useSpacesStore } from '@/stores/useSpacesStore';
     import { LayoutType } from '@/types';
@@ -11,6 +12,7 @@
     const route = useRoute();
     const auth = useAuthStore();
     const spaces = useSpacesStore();
+    const planCaps = usePlanCaps();
 
     // Switch the shell on the active route's layoutType meta. APP routes
     // (dashboard / pricing / account) get the in-app nav; everything else is bare.
@@ -18,8 +20,10 @@
         route.meta.layoutType === LayoutType.APP ? AppLayout : PlainLayout
     );
 
-    // On reload, restore the user's spaces from the server when already signed in.
+    // Load server-authoritative plan caps (anonymous — also needed by the public
+    // pricing page). On reload, restore the user's spaces when already signed in.
     onMounted(() => {
+        void planCaps.hydrate();
         if (auth.hasTokens) void spaces.hydrate();
     });
 </script>

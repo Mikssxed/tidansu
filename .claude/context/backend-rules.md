@@ -219,6 +219,35 @@ var currentUser = userContext.GetCurrentUser();
 
 ---
 
+## Plan limits — `PlanPolicy` (single source of truth)
+
+The plan-limit decision lives in **one deep domain module**, not in the handlers.
+Do not re-derive cap math in a handler.
+
+- **`PlanCaps`** (`Domain/Constants/PlanCaps.cs`) — the enforced caps per plan and
+  their single source of truth. `PlanCaps.For(plan)` returns
+  `(int? Spaces, int? Zones, int? Items, bool Photos, bool Sync)`; a **null numeric
+  cap means unlimited** (Pro). The `/api/plans` endpoint serves these to the
+  frontend, which maps `null → Infinity`.
+- **`PlanPolicy`** (`Domain/Constants/PlanPolicy.cs`) — pure, static, returns the
+  blocking `PlanLimitReasons` value or `null`:
+  - `CheckNewSpace(plan, currentSpaceCount, SpaceUsage space)` — genesis; space
+    count gates incrementally (`>=`), the submitted graph's zones/items/photos gate
+    on totals (`>`).
+  - `CheckSpaceMutation(plan, before, after)` — mutation; the downgrade rule keeps
+    over-cap content editable (reject only when over cap **and** growing).
+- **`SpaceUsage`** — `(int Zones, int Items, int Photos)`, snapshotted by the caller.
+
+Handlers stay one-liners; they throw, the policy decides:
+
+```csharp
+if (PlanPolicy.CheckNewSpace(user.Plan, existingCount, usage) is { } reason)
+    throw new PlanLimitException(reason);
+```
+
+`PlanPolicy` is pure and covered by `tests/Tidansu.Domain.Tests` — extend those
+table-driven tests when you change a cap rule; the interface is the test surface.
+
 ## ApiOperationResult Response Wrapper
 
 Controllers return `ApiOperationResult<T>` for consistent API responses:

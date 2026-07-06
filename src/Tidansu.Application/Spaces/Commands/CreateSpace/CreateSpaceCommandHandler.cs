@@ -23,15 +23,10 @@ public class CreateSpaceCommandHandler(
 
         var dto = request.Space;
 
-        if (!PlanLimits.IsPro(user.Plan))
-        {
-            var existingCount = await spaces.CountByUserAsync(userId, cancellationToken);
-            if (existingCount >= PlanLimits.FreeSpaces) throw new PlanLimitException(PlanLimitReasons.Spaces);
-            if (dto.Zones.Count > PlanLimits.FreeZonesPerSpace) throw new PlanLimitException(PlanLimitReasons.Zones);
-            if (dto.Items.Count > PlanLimits.FreeItemsPerSpace) throw new PlanLimitException(PlanLimitReasons.Items);
-            if (!PlanLimits.AllowsPhotos(user.Plan) && dto.Items.Any(i => i.Photo is not null))
-                throw new PlanLimitException(PlanLimitReasons.Photos);
-        }
+        var existingCount = await spaces.CountByUserAsync(userId, cancellationToken);
+        var usage = new SpaceUsage(dto.Zones.Count, dto.Items.Count, dto.Items.Count(i => i.Photo is not null));
+        if (PlanPolicy.CheckNewSpace(user.Plan, existingCount, usage) is { } reason)
+            throw new PlanLimitException(reason);
 
         logger.LogInformation("Creating space {SpaceId} for user {UserId}", dto.Id, userId);
 

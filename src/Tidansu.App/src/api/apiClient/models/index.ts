@@ -252,6 +252,33 @@ export function createItemDtoFromDiscriminatorValue(parseNode: ParseNode | undef
 /**
  * Creates a new instance of the appropriate class based on discriminator value
  * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {PlanCapsDto}
+ */
+// @ts-ignore
+export function createPlanCapsDtoFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoPlanCapsDto;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {PlanCapsDtoListApiOperationResult_errors}
+ */
+// @ts-ignore
+export function createPlanCapsDtoListApiOperationResult_errorsFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoPlanCapsDtoListApiOperationResult_errors;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {PlanCapsDtoListApiOperationResult}
+ */
+// @ts-ignore
+export function createPlanCapsDtoListApiOperationResultFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoPlanCapsDtoListApiOperationResult;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
  * @returns {ProblemDetails}
  */
 // @ts-ignore
@@ -554,6 +581,45 @@ export function deserializeIntoItemDto(itemDto: Partial<ItemDto> | undefined = {
 }
 /**
  * The deserialization information for the current model
+ * @param PlanCapsDto The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoPlanCapsDto(planCapsDto: Partial<PlanCapsDto> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "items": n => { planCapsDto.items = n.getNumberValue(); },
+        "photos": n => { planCapsDto.photos = n.getBooleanValue(); },
+        "plan": n => { planCapsDto.plan = n.getStringValue(); },
+        "spaces": n => { planCapsDto.spaces = n.getNumberValue(); },
+        "sync": n => { planCapsDto.sync = n.getBooleanValue(); },
+        "zones": n => { planCapsDto.zones = n.getNumberValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param PlanCapsDtoListApiOperationResult The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoPlanCapsDtoListApiOperationResult(planCapsDtoListApiOperationResult: Partial<PlanCapsDtoListApiOperationResult> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "data": n => { planCapsDtoListApiOperationResult.data = n.getCollectionOfObjectValues<PlanCapsDto>(createPlanCapsDtoFromDiscriminatorValue); },
+        "errors": n => { planCapsDtoListApiOperationResult.errors = n.getObjectValue<PlanCapsDtoListApiOperationResult_errors>(createPlanCapsDtoListApiOperationResult_errorsFromDiscriminatorValue); },
+        "isSuccess": n => { planCapsDtoListApiOperationResult.isSuccess = n.getBooleanValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param PlanCapsDtoListApiOperationResult_errors The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoPlanCapsDtoListApiOperationResult_errors(planCapsDtoListApiOperationResult_errors: Partial<PlanCapsDtoListApiOperationResult_errors> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+    }
+}
+/**
+ * The deserialization information for the current model
  * @param ProblemDetails The instance to deserialize into.
  * @returns {Record<string, (node: ParseNode) => void>}
  */
@@ -799,6 +865,48 @@ export interface ItemDto extends Parsable {
      * The zoneId property
      */
     zoneId: string;
+}
+export interface PlanCapsDto extends Parsable {
+    /**
+     * The items property
+     */
+    items?: number | null;
+    /**
+     * The photos property
+     */
+    photos: boolean;
+    /**
+     * The plan property
+     */
+    plan: string;
+    /**
+     * The spaces property
+     */
+    spaces?: number | null;
+    /**
+     * The sync property
+     */
+    sync: boolean;
+    /**
+     * The zones property
+     */
+    zones?: number | null;
+}
+export interface PlanCapsDtoListApiOperationResult extends Parsable {
+    /**
+     * The data property
+     */
+    data?: PlanCapsDto[] | null;
+    /**
+     * The errors property
+     */
+    errors: PlanCapsDtoListApiOperationResult_errors;
+    /**
+     * The isSuccess property
+     */
+    isSuccess: boolean;
+}
+export interface PlanCapsDtoListApiOperationResult_errors extends AdditionalDataHolder, Parsable {
 }
 export interface ProblemDetails extends AdditionalDataHolder, ApiError, Parsable {
     /**
@@ -1048,6 +1156,46 @@ export function serializeItemDto(writer: SerializationWriter, itemDto: Partial<I
     writer.writeNumberValue("slotIndex", itemDto.slotIndex);
     writer.writeCollectionOfPrimitiveValues<string>("tags", itemDto.tags);
     writer.writeStringValue("zoneId", itemDto.zoneId);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param PlanCapsDto The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializePlanCapsDto(writer: SerializationWriter, planCapsDto: Partial<PlanCapsDto> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!planCapsDto || isSerializingDerivedType) { return; }
+    writer.writeNumberValue("items", planCapsDto.items);
+    writer.writeBooleanValue("photos", planCapsDto.photos);
+    writer.writeStringValue("plan", planCapsDto.plan);
+    writer.writeNumberValue("spaces", planCapsDto.spaces);
+    writer.writeBooleanValue("sync", planCapsDto.sync);
+    writer.writeNumberValue("zones", planCapsDto.zones);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param PlanCapsDtoListApiOperationResult The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializePlanCapsDtoListApiOperationResult(writer: SerializationWriter, planCapsDtoListApiOperationResult: Partial<PlanCapsDtoListApiOperationResult> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!planCapsDtoListApiOperationResult || isSerializingDerivedType) { return; }
+    writer.writeCollectionOfObjectValues<PlanCapsDto>("data", planCapsDtoListApiOperationResult.data, serializePlanCapsDto);
+    writer.writeObjectValue<PlanCapsDtoListApiOperationResult_errors>("errors", planCapsDtoListApiOperationResult.errors, serializePlanCapsDtoListApiOperationResult_errors);
+    writer.writeBooleanValue("isSuccess", planCapsDtoListApiOperationResult.isSuccess);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param PlanCapsDtoListApiOperationResult_errors The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializePlanCapsDtoListApiOperationResult_errors(writer: SerializationWriter, planCapsDtoListApiOperationResult_errors: Partial<PlanCapsDtoListApiOperationResult_errors> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!planCapsDtoListApiOperationResult_errors || isSerializingDerivedType) { return; }
+    writer.writeAdditionalData(planCapsDtoListApiOperationResult_errors.additionalData);
 }
 /**
  * Serializes information the current object

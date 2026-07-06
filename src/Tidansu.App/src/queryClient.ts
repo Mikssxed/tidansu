@@ -12,3 +12,4 @@ export const queryClient = new QueryClient({
 });
 
 export const SPACES_QUERY_KEY = ['spaces'] as const;
+export const PLANS_QUERY_KEY = ['plans'] as const;
