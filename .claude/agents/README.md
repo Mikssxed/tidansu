@@ -61,6 +61,25 @@ command, not an agent, because subagents can't spawn other subagents.
   an end-to-end **drive** of the flow, always exercising the plan-cap path where
   relevant.
 
+## Skills wiring
+
+Each agent has a **Skills to use** section pointing it at the installed engineering
+skills (Matt Pocock's `.agents/skills` + the `superpowers` plugin) it should invoke
+inline at the right moment — e.g. `feature-developer` → `superpowers:test-driven-
+development` / `systematic-debugging` / `verification-before-completion`,
+`pm-requirements-analyst` → `superpowers:brainstorming`, reviewers →
+`receiving-code-review` / `diagnosing-bugs`.
+
+Skills that **fan out into parallel sub-agents** (`/code-review`, `design-an-
+interface`, `improve-codebase-architecture`, `research`, superpowers'
+`dispatching-parallel-agents`) can't run *inside* an agent — a sub-agent can't spawn
+sub-agents. Those are reserved for the **top level**: run them from the main session
+or via `/build-feature` (see its "Skills you can run at the orchestration level").
+
+Issue-tracker, triage-label, and domain-doc conventions the skills read live in
+`docs/agents/` (set up via `/setup-matt-pocock-skills`) and are summarized in
+`CLAUDE.md` under **## Agent skills**.
+
 ## Agent memory
 
 Each agent declares `memory: project` and accumulates durable, repo-specific

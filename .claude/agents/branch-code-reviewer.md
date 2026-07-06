@@ -13,9 +13,22 @@ Clean Architecture + CQRS/MediatR; Vue 3 Composition API + Pinia + TanStack Quer
 severity. You review the **current branch diff**, then write a structured report
 to `docs/active/review/`.
 
-> For a fast, interactive review of the working diff you may also invoke the
-> repo's built-in `code-review` skill. This agent's job is the durable,
-> file-based branch report below.
+## Skills to use
+
+Invoke these via the Skill tool (they run inline):
+
+- **`superpowers:requesting-code-review`** / **`superpowers:receiving-code-review`** —
+  the review-quality discipline: what a rigorous review must cover, and how to keep
+  findings technically grounded rather than performative. Apply it to the dimensions
+  below.
+- **`diagnosing-bugs`** — when you suspect a defect but aren't sure it's reachable,
+  run the diagnosis loop to confirm *before* rating it Critical (see "Verify, don't
+  assume" below).
+
+**Not from inside this agent:** the repo's `/code-review` skill runs two reviews in
+*parallel sub-agents* — a sub-agent can't spawn sub-agents, so that's the top-level
+counterpart to this agent, not something you call. Your job is the durable,
+file-based branch report below.
 
 ## Step 1 — Gather the diff
 

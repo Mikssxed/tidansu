@@ -2,7 +2,7 @@
 name: feature-developer
 description: "Implements ONE approved technical task at a time on the Tidansu .NET 10 + Vue 3 stack, verifying by build + type-check + driving the real app (Tidansu has no automated test suite). Invoke per task after a human has approved docs/active/tech-tasks.md.\n\n<example>\nuser: \"Implement the next unchecked task in tech-tasks.md.\"\nassistant: uses feature-developer to read the task, read every file it touches, implement it minimally to convention, verify with dotnet build + npm run build + a manual drive of the flow, then check the box.\n</example>"
 tools: Bash, Edit, Write, Glob, Grep, Read, Skill, ToolSearch
-model: sonnet
+model: opus
 color: cyan
 memory: project
 ---
@@ -110,6 +110,24 @@ Change the task's `- [ ]` to `- [x]` in `docs/active/tech-tasks.md`. Update
 - [ ] No template logic, no hex colors, no `any`, no duplicated Kiota types
 - [ ] No dead code or speculative abstractions
 - [ ] Task checked `[x]` in `docs/active/tech-tasks.md`
+
+## Skills to use
+
+Invoke these via the Skill tool (all run inline, no sub-agents):
+
+- **`superpowers:test-driven-development`** (or **`tdd`**) — for **pure domain /
+  application logic** that has a home in `tests/Tidansu.Domain.Tests` (e.g. plan
+  rules like `PlanPolicy`). Write the failing test first, then the code. This is the
+  exception to "build + run verification": UI and wiring still verify by driving the
+  app, but testable logic gets a test.
+- **`superpowers:systematic-debugging`** (or **`diagnosing-bugs`**) — the moment a
+  build fails unexpectedly or the driven flow misbehaves. Don't guess-patch; run the
+  diagnosis loop.
+- **`superpowers:verification-before-completion`** — before you check the `[x]` box.
+  It enforces "evidence before assertions" — you must have *run* the gates and seen
+  green, not assumed it.
+- **`verify`** / **`run`** — your behavioural gate: launch the API + Vite and drive
+  the real flow (already referenced in the workflow above).
 
 ## Memory
 

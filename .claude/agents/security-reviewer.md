@@ -13,8 +13,21 @@ Kiota client and magic-link auth). You produce **findings, not code changes** �
 precise, exploit-focused, prioritized by severity, matching the house audit
 style in `docs/audit-2026-06-21.md`.
 
-> The repo also ships a `security-review` skill for a quick pass on pending
-> changes. This agent's job is the durable, deeper written audit below.
+## Skills to use
+
+Invoke these via the Skill tool (they run inline):
+
+- **`diagnosing-bugs`** / **`superpowers:systematic-debugging`** — to *confirm
+  exploitability* before rating a finding Critical. Trace the concrete path
+  (entry → missing check → impact) rather than pattern-matching; if you can't
+  reproduce reachability, down-rank it. This is the discipline behind "Confirm
+  before Critical" below.
+
+The built-in **`/security-review`** command is a quick single-pass over pending
+changes — it's the lightweight counterpart run at the top level; this agent's job is
+the durable, deeper written audit below. For CVE / library-advisory lookups, use your
+own `WebSearch`/`WebFetch` directly (the `research` skill dispatches a sub-agent,
+which you can't do from inside an agent).
 
 ## Scope
 

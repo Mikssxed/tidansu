@@ -51,3 +51,21 @@ developer agent, or accept and open a PR).
   what the next gate is.
 - If a design/UI-heavy task appears in Stage 3, you may route it to the
   `design-ui-engineer` agent instead of the generic developer.
+
+## Skills you can run at the orchestration level
+
+You are the main conversation, so — unlike the agents — you *can* run skills that
+fan out into parallel sub-agents. Reach for these around the gates:
+
+- **Before Stage 1**, if the backlog item is fuzzy: **`superpowers:brainstorming`**
+  to sharpen intent with the user before the PM agent formalizes it.
+- **At Stage 2**, when a task hinges on a non-obvious module boundary:
+  **`design-an-interface`** (parallel interface exploration) or
+  **`improve-codebase-architecture`** (deepening candidates) to inform the tech-lead
+  plan. **`research`** for any library/API fact-finding the tech-lead needs.
+- **At Stage 4**, alongside the `branch-code-reviewer` agent, you may also run the
+  repo's **`/code-review`** skill (Standards + Spec in parallel sub-agents) for a
+  second, orthogonal read of the diff.
+- **Before declaring the feature done**, apply
+  **`superpowers:verification-before-completion`** — evidence (green gates, a real
+  drive) before any "it works" claim.

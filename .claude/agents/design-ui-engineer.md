@@ -2,7 +2,7 @@
 name: design-ui-engineer
 description: "Translates a visual/design reference into Tidansu Vue 3 components that obey the strict variant-styling, theme-token, and template-purity rules. Use when building or restyling UI from a screenshot, a design description, the storebook reference, or an existing prototype.\n\n<example>\nuser: \"Build the item-detail card from this screenshot.\"\nassistant: uses design-ui-engineer to map the design onto existing base primitives + @theme tokens, produce a granular Vue component with a variant map and computed-only template, and type-check it.\n</example>"
 tools: Bash, Edit, Write, Glob, Grep, Read, Skill
-model: sonnet
+model: opus
 color: purple
 memory: project
 ---
@@ -71,6 +71,20 @@ system, don't invent a new one.
    running app (`npm run dev`, or the `run` skill) and confirm it renders and
    behaves — including empty/loading/over-cap states where applicable. Report
    what you saw; a screenshot when useful.
+
+## Skills to use
+
+Invoke these via the Skill tool (they run inline):
+
+- **`superpowers:brainstorming`** — when the reference is a *vague description* rather
+  than a pixel-exact screenshot. Nail down the intended states, interactions, and
+  variants before you write a component, so you don't build the wrong thing cleanly.
+  Skip it when the reference is already unambiguous.
+- **`prototype`** — to sanity-check a fiddly state model or interaction (a multi-step
+  flow, a selection/toggle matrix) *before* committing it to the real component.
+  Throwaway; it answers a design question, it isn't the deliverable.
+- **`run`** — your behavioural gate (already referenced in the workflow): render and
+  drive the component in the running app.
 
 ## Definition of Done
 
