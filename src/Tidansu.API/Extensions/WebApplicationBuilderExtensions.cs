@@ -14,6 +14,13 @@ namespace Tidansu.Extensions;
 public static class WebApplicationBuilderExtensions
 {
     public const string AuthRateLimitPolicy = "auth";
+
+    // Stricter per-IP window for the magic-link REQUEST endpoint specifically: it now
+    // triggers real, quota-metered outbound email, so it must be tighter than the
+    // shared "auth" policy. 3/min per IP comfortably covers a real user's retries/
+    // double-clicks while sharply limiting how fast one IP can drive sends.
+    public const string MagicLinkRateLimitPolicy = "magic-link";
+
     public const string FrontendCorsPolicy = "frontend";
 
     public static void AddPresentation(this WebApplicationBuilder builder)
@@ -105,6 +112,14 @@ public static class WebApplicationBuilderExtensions
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 10,
+                        Window = TimeSpan.FromMinutes(1)
+                    }));
+            options.AddPolicy(MagicLinkRateLimitPolicy, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 3,
                         Window = TimeSpan.FromMinutes(1)
                     }));
         });

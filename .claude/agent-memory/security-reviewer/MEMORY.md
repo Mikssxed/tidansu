@@ -1,0 +1,5 @@
+# Security-reviewer memory index
+
+- [Confirmed auth/magic-link protections](confirmed-magic-link-protections.md) — verified controls on the magic-link path; don't re-flag these.
+- [High-risk files](high-risk-files.md) — files that concentrate auth/secret/redirect risk; read these for any auth-adjacent change.
+- [Recurring gaps](recurring-gaps.md) — patterns that keep surfacing across reviews.

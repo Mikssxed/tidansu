@@ -10,31 +10,42 @@ repo's conventions (`CLAUDE.md` + `.claude/context/*.md`) and **verifies by buil
 
 ```
 docs/backlog.md
+      │  (orchestrator seeds a task folder from _TEMPLATE: docs/active/tasks/<id>-<slug>/task.md)
+      ▼
+docs/active/tasks/<id>-<slug>/task.md   ← compact brief + status:, every agent reads it first
       │  pm-requirements-analyst   (business language, phased, plan-gated)
       ▼
-docs/active/requirements.md   ──[human approves]──┐
+.../<id>-<slug>/requirements.md   ──[human approves]──┐
       │  tech-lead   (ordered tasks, file paths, migrations, Kiota regen, security)
       ▼
-docs/active/tech-tasks.md     ──[human approves]──┐
+.../<id>-<slug>/tech-tasks.md     ──[human approves]──┐
       │  feature-developer   (ONE task at a time; dotnet build + npm run build + drive app)
       ▼
    working code               ──[all tasks checked]──┐
       │  branch-code-reviewer  (+ security-reviewer if auth/billing/plan/redirect/photo)
       ▼
-docs/active/review/YYYY-MM-DD-<branch>.md
+.../<id>-<slug>/review.md
 ```
+
+**One folder per task** (`docs/active/tasks/<id>-<slug>/`) is the unit of work and
+the single source of context — see `docs/active/tasks/README.md`. Each stage reads
+`task.md` first and writes its own file into the same folder, so independent tasks
+never collide and requirements/tech-planning can run in **parallel** (implementation
+serializes when tasks share files).
 
 Run it end-to-end with the **`/build-feature`** slash command (it dispatches each
 agent and stops at every human gate), or invoke any agent directly by name.
 
 ## Agents
 
+All paths below are inside the task folder `docs/active/tasks/<id>-<slug>/`.
+
 | Agent | Role | Reads | Writes |
 |---|---|---|---|
-| `pm-requirements-analyst` | Backlog item → functional requirements (business language, phased, plan-gated) | `docs/backlog.md`, `CLAUDE.md` | `docs/active/requirements.md` |
-| `tech-lead` | Requirements → ordered technical tasks with exact file paths, migration/Kiota tasks, security & scalability notes | `docs/active/requirements.md`, context rules, code | `docs/active/tech-tasks.md` |
-| `feature-developer` | Implements one approved task; verifies via build + type-check + driving the app | `docs/active/tech-tasks.md`, touched files | code + checks the task box |
-| `branch-code-reviewer` | Full branch review vs `origin/main`, prioritized findings | branch diff, `CLAUDE.md` | `docs/active/review/YYYY-MM-DD-<branch>.md` |
+| `pm-requirements-analyst` | Backlog item → functional requirements (business language, phased, plan-gated) | `task.md`, `docs/backlog.md`, `CLAUDE.md` | `requirements.md` (+ updates `task.md`) |
+| `tech-lead` | Requirements → ordered technical tasks with exact file paths, migration/Kiota tasks, security & scalability notes | `task.md`, `requirements.md`, context rules, code | `tech-tasks.md` (+ updates `task.md`) |
+| `feature-developer` | Implements one approved task; verifies via build + type-check + driving the app | `task.md`, `tech-tasks.md`, touched files | code + checks the task box (+ `task.md` status) |
+| `branch-code-reviewer` | Full branch review vs `origin/main`, prioritized findings | branch diff, `task.md`, `CLAUDE.md` | `review.md` (+ updates `task.md`) |
 | `security-reviewer` | Deeper security audit (IDOR, plan bypass, auth, billing, redirects, file handling) | branch diff or full sweep | `docs/security-review-YYYY-MM-DD-*.md` |
 | `design-ui-engineer` | Visual reference → Vue components obeying variant/token/template-purity rules | design reference, `style.css`, base components | Vue components |
 

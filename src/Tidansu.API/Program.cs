@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Tidansu.Application.Extensions;
 using Tidansu.Extensions;
@@ -21,6 +22,20 @@ if (!string.IsNullOrEmpty(connectionString))
     var dbContext = scope.ServiceProvider.GetRequiredService<TidansuDbContext>();
     dbContext.Database.Migrate();
 }
+
+// Resolve the real client IP/scheme from X-Forwarded-For / X-Forwarded-Proto so the
+// per-IP rate limiter partitions on the actual client (not the proxy) behind a reverse
+// proxy / load balancer. Runs first so every downstream component sees the corrected IP.
+//
+// SECURITY (B-7): KnownProxies/KnownNetworks are left at the framework default (loopback
+// only), so forwarded headers are trusted ONLY from a loopback proxy — an arbitrary
+// client CANNOT spoof X-Forwarded-For to dodge the limiter. The real production proxy's
+// address(es)/network(s) MUST be added to KnownProxies/KnownNetworks at deploy time
+// (task B-7), otherwise the forwarded IP will be ignored and every user shares one bucket.
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+});
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
 

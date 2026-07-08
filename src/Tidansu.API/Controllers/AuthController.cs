@@ -19,7 +19,7 @@ public class AuthController(IMediator mediator) : ControllerBase
 {
     /// <summary>Issue a one-time magic-link sign-in email.</summary>
     [HttpPost("magic-link")]
-    [EnableRateLimiting(WebApplicationBuilderExtensions.AuthRateLimitPolicy)]
+    [EnableRateLimiting(WebApplicationBuilderExtensions.MagicLinkRateLimitPolicy)]
     [ProducesResponseType<ApiOperationResult<RequestMagicLinkResult>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<Ok<ApiOperationResult<RequestMagicLinkResult>>> RequestMagicLink([FromBody] RequestMagicLinkCommand command)

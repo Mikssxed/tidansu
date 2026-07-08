@@ -95,8 +95,12 @@ origin (never `*` with credentials). Flag regressions.
 
 ## Output
 
-Write to `docs/security-review-YYYY-MM-DD-<branch-or-scope>.md` (today's date from
-`currentDate`). Structure:
+When auditing a single task from the pipeline, the orchestrator names its task
+folder — write to `<task-folder>/security-review.md` (e.g.
+`docs/active/tasks/B-4-real-login-email/security-review.md`) so the finding lives
+beside that task's `review.md`. For a whole-codebase sweep (no single task), write
+to `docs/security-review-YYYY-MM-DD-<scope>.md` (today's date from `currentDate`).
+Structure:
 
 ```markdown
 # Tidansu — Security Review

@@ -66,23 +66,26 @@
                 </div>
 
                 <!-- Levels -->
-                <div v-if="!zone.floor">
-                    <label class="mb-1 block text-[12px] text-text-2">Levels (tiers)</label>
-                    <div class="flex items-center justify-between rounded-ctrl border border-border bg-surface-2 px-3 py-1.5">
-                        <span class="text-[13px] text-text-2">Shelves in this unit</span>
-                        <div class="flex items-center gap-3">
+                <div
+                    v-if="!zone.floor"
+                    class="sm:col-span-2 lg:col-span-3"
+                >
+                    <label class="mb-1 block text-[13px] text-text-2">Levels (tiers)</label>
+                    <div class="flex items-center justify-between rounded-ctrl border border-border bg-surface-2 px-4 py-3">
+                        <span class="text-[14px] text-text-2">Shelves in this unit</span>
+                        <div class="flex items-center gap-4">
                             <button
                                 type="button"
-                                class="text-text-2 disabled:opacity-40"
+                                class="flex size-7 items-center justify-center rounded-ctrl text-[18px] text-text-2 hover:bg-surface-3 disabled:opacity-40 disabled:hover:bg-transparent"
                                 :disabled="levelsAtMin"
                                 @click="decLevels"
                             >
                                 −
                             </button>
-                            <span class="w-4 text-center text-[14px] tabular-nums text-text">{{ levels }}</span>
+                            <span class="w-5 text-center text-[16px] tabular-nums text-text">{{ levels }}</span>
                             <button
                                 type="button"
-                                class="text-text-2 disabled:opacity-40"
+                                class="flex size-7 items-center justify-center rounded-ctrl text-[18px] text-text-2 hover:bg-surface-3 disabled:opacity-40 disabled:hover:bg-transparent"
                                 :disabled="levelsAtMax"
                                 @click="incLevels"
                             >
@@ -91,11 +94,11 @@
                         </div>
                     </div>
                     <!-- shelves stack top → bottom (level 1 = top) -->
-                    <div class="mt-2 flex flex-col gap-1">
+                    <div class="mt-2 flex flex-col gap-1.5">
                         <div
                             v-for="lvl in levelPreview"
                             :key="lvl"
-                            class="flex items-center gap-1.5 rounded-[6px] border border-border bg-surface-2 px-2 py-1 text-[11px] text-text-2"
+                            class="flex items-center gap-2 rounded-[6px] border border-border bg-surface-2 px-2.5 py-1.5 text-[12px] text-text-2"
                         >
                             <span
                                 class="size-1.5 rounded-chip"
@@ -163,7 +166,7 @@
                 <BaseButton
                     variant="danger"
                     size="sm"
-                    class="sm:col-span-2 lg:col-span-3"
+                    class="justify-self-start sm:col-span-2 lg:col-span-3"
                     @click="onDelete"
                 >
                     <BaseIcon

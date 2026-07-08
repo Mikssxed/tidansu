@@ -97,6 +97,47 @@ public class ErrorHandlingMiddleware(ILogger<ErrorHandlingMiddleware> logger) : 
             };
             await context.Response.WriteAsJsonAsync(errorResponse);
         }
+        catch (EmailDeliveryException ex)
+        {
+            // Delivery failed — report as a failure (never a silent success). The
+            // exception message carries only the recipient (no body/link/secret);
+            // the client gets a generic message.
+            logger.LogError(ex.Message);
+
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/json";
+
+            var errorResponse = new ApiOperationResult
+            {
+                IsSuccess = false,
+                Errors = new Dictionary<string, string[]>
+                {
+                    { ApiOperationResult.GeneralErrorKey, new[] { "Something went wrong." } }
+                }
+            };
+
+            await context.Response.WriteAsJsonAsync(errorResponse);
+        }
+        catch (MagicLinkThrottledException ex)
+        {
+            // Per-recipient throttle hit. Generic 429 identical whether or not the
+            // account exists (anti-enumeration). Message carries only the recipient.
+            logger.LogWarning(ex.Message);
+
+            context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+            context.Response.ContentType = "application/json";
+
+            var errorResponse = new ApiOperationResult
+            {
+                IsSuccess = false,
+                Errors = new Dictionary<string, string[]>
+                {
+                    { ApiOperationResult.GeneralErrorKey, new[] { "Too many requests. Please try again later." } }
+                }
+            };
+
+            await context.Response.WriteAsJsonAsync(errorResponse);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, ex.Message);

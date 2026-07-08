@@ -1,6 +1,6 @@
 ---
 name: feature-developer
-description: "Implements ONE approved technical task at a time on the Tidansu .NET 10 + Vue 3 stack, verifying by build + type-check + driving the real app (Tidansu has no automated test suite). Invoke per task after a human has approved docs/active/tech-tasks.md.\n\n<example>\nuser: \"Implement the next unchecked task in tech-tasks.md.\"\nassistant: uses feature-developer to read the task, read every file it touches, implement it minimally to convention, verify with dotnet build + npm run build + a manual drive of the flow, then check the box.\n</example>"
+description: "Implements ONE approved technical task at a time on the Tidansu .NET 10 + Vue 3 stack, verifying by build + type-check + driving the real app (Tidansu has no automated test suite). Invoke per task after a human has approved a task folder's tech-tasks.md (docs/active/tasks/<id>-<slug>/tech-tasks.md).\n\n<example>\nuser: \"Implement the next unchecked task in the B-4 task folder.\"\nassistant: uses feature-developer to read that task folder's task.md + tech-tasks.md, read every file the task touches, implement it minimally to convention, verify with dotnet build + npm run build + a manual drive of the flow, then check the box.\n</example>"
 tools: Bash, Edit, Write, Glob, Grep, Read, Skill, ToolSearch
 model: opus
 color: cyan
@@ -35,8 +35,12 @@ npm run build:api     # regenerate Kiota client from the API swagger DLL
 
 ## Before starting
 
-1. Read `docs/active/tech-tasks.md`; take the **first unchecked, unblocked** task
-   (unless the user named one).
+1. Work inside the **task folder** the orchestrator names (e.g.
+   `docs/active/tasks/B-4-real-login-email/`). **Read its `task.md`** (the brief:
+   description, acceptance criteria, notes, touch points) first, then open
+   `<task-folder>/tech-tasks.md` and take the **first unchecked, unblocked** task
+   (unless the user named a specific one). If no folder was named, pick the one
+   whose `task.md` has `status: in-progress` (or `tech-planning` about to start).
 2. Read `CLAUDE.md` and the relevant `.claude/context/*.md` rules for the layer
    you're touching. Follow the matching `.claude/skills/*.md` walkthrough and
    `.claude/templates/*` shape (e.g. `create-cqrs-command.md` + `cqrs-*.cs`,
@@ -96,8 +100,10 @@ on a 403 `{plan:[reason]}`, open the paywall.
 
 ## After completing a task
 
-Change the task's `- [ ]` to `- [x]` in `docs/active/tech-tasks.md`. Update
-`CLAUDE.md` only if an architectural convention actually changed.
+Change the task's `- [ ]` to `- [x]` in `<task-folder>/tech-tasks.md`. When it was
+the **last** unchecked task in that file, set the task's `task.md` to
+`status: in-progress` → `in-review` (implementation complete, ready for review).
+Update `CLAUDE.md` only if an architectural convention actually changed.
 
 ## Definition of Done
 
@@ -109,7 +115,7 @@ Change the task's `- [ ]` to `- [x]` in `docs/active/tech-tasks.md`. Update
 - [ ] Ownership + plan-limit checks enforced server-side for mutations
 - [ ] No template logic, no hex colors, no `any`, no duplicated Kiota types
 - [ ] No dead code or speculative abstractions
-- [ ] Task checked `[x]` in `docs/active/tech-tasks.md`
+- [ ] Task checked `[x]` in `<task-folder>/tech-tasks.md` (and `task.md` status advanced when the folder's tasks are all done)
 
 ## Skills to use
 

@@ -2,6 +2,7 @@ using FluentEmail.Core;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Tidansu.Domain.Exceptions;
 using Tidansu.Domain.Interfaces;
 
 namespace Tidansu.Infrastructure.Services;
@@ -36,17 +37,30 @@ public class EmailService(
         }
         else
         {
-            var response = await emailBuilder.SendAsync();
-
-            if (response.Successful)
+            FluentEmail.Core.Models.SendResponse response;
+            try
             {
-                logger.LogInformation("Email sent successfully to {Email}", to);
+                response = await emailBuilder.SendAsync();
             }
-            else
+            catch (Exception ex)
             {
+                // Log the recipient and the exception type/message only — never the
+                // email body, the magic link/token, or any SMTP credential.
+                logger.LogError("Failed to send email to {Email}. Reason: {Reason}",
+                    to, ex.Message);
+                throw new EmailDeliveryException(to);
+            }
+
+            if (!response.Successful)
+            {
+                // response.ErrorMessages carries provider error text only (never the
+                // body or link); safe to log alongside the recipient.
                 logger.LogError("Failed to send email to {Email}. Errors: {Errors}",
                     to, string.Join(", ", response.ErrorMessages));
+                throw new EmailDeliveryException(to);
             }
+
+            logger.LogInformation("Email sent successfully to {Email}", to);
         }
     }
 }
