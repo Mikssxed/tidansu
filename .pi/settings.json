@@ -1,0 +1,14 @@
+{
+  "skills": [
+    ".pi/skills"
+  ],
+  "prompts": [
+    ".pi/prompts"
+  ],
+  "context": [
+    ".pi/context"
+  ],
+  "notes": {
+    "kiota-client-guard": "src/api/apiClient/ is the generated Kiota client — never hand-edit it. Regenerate with: cd src/Tidansu.App && npm run build:api (after a fresh dotnet build of the API). This was a PreToolUse hook in .claude/settings.json for Claude Code; here it's a project convention."
+  }
+}

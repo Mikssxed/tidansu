@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for pi (and Claude Code) when working in this repository.
+Guidance for pi when working in this repository.
 
 ## Overview
 
@@ -87,7 +87,8 @@ For a `v-for` whose items need any derived value/class, **compute a fully-mapped
 array first** (each element already carries its `label`, `meta`, `classes`,
 `selected`, etc.) and iterate that — never compute per-row in the template.
 Allowed as-is: `v-if="store.isPro"`, `:to="{ name: 'spaces' }"`, `v-model`,
-`@click="onSave"`, `@click="selectType(s.id)"` (named handler taking a loop arg).
+`@click="onSave"`, `@click="selectType(s.id)"` (named handler taking a `v-for`
+loop arg).
 
 ### Locked product config (ship, never expose as toggles)
 Cards dashboard · Airy density (`--pad:1.18`) · Soft corners (`--radius-card:16px`,
@@ -102,17 +103,10 @@ mutate.** Downgrade keeps data but makes over-cap content read-only.
 
 ## .pi/ harness
 
-`.pi/` is the pi-native harness directory:
-- `CLAUDE.md` — this file (also at repo root, loaded by pi)
-- `CONTEXT.md` — domain model / ubiquitous language
-- `PROJECT-MEMORY.md` — accumulated project memory
-- `context/` — architecture, backend-rules, frontend-rules, project-overview (loaded on-demand by agents)
-- `skills/` — agent skills + feature walkthroughs
-- `templates/` — code templates (CQRS, entities, Vue components)
-- `prompts/` — slash command prompt templates (e.g. `build-feature`)
-
-`.claude/` carries the Claude Code equivalents (agents, agent-memory, settings).
-Both are kept in sync; `.pi/` is the authoritative pi location.
+`.pi/context/` (architecture, backend-rules, frontend-rules, project-overview),
+`.pi/skills/` (feature walkthroughs), and `.pi/templates/` carry detailed
+patterns reused from SelfGrind. Treat domain examples there (tasks/XP) as
+illustrative — Tidansu's domain is spaces/zones/items.
 
 ## Agent skills
 
