@@ -14,3 +14,8 @@ Known-open gaps — check status each review rather than re-discovering:
   **How to apply:** flag whenever reviewing rate-limiting or a deployment/proxy change.
 
 - **JWT-secret guard fires only for `IsProduction`**, while the SMTP guard fires for all non-Development envs. A `Staging` box can boot with a weak/missing JWT secret. Low; note if Staging becomes a real environment.
+
+- **Fail-loud config guards miss the security-critical key.** B-6's Stripe `IsConfigured`/startup guard checked `SecretKey`+`ProPriceId` but omitted `WebhookSecret` — the one bearer credential gating the anonymous webhook (empty secret = forgeable = free Pro). Pattern: when reviewing any `IsConfigured`/fail-loud guard, enumerate *every* secret the feature depends on and confirm each is in the guard, not just the "obvious" ones.
+  **How to apply:** on any new config guard or billing/auth secret, check the signing/verification secret is required, not just the API key.
+
+- **Webhook/event handlers claim idempotency and mutate in separate `SaveChanges`.** Atomic dedupe insert is correct, but a mutation failure after the claim commits strands the operation (Stripe won't retry). Check claim+mutate share one unit of work whenever reviewing at-least-once event handlers.

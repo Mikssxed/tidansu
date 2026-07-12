@@ -17,6 +17,31 @@
             </button>
         </div>
 
+        <!-- Billing unavailable (e.g. Stripe misconfigured / 503) -->
+        <div
+            v-if="session.billingMessage"
+            class="mt-4 flex items-start gap-2.5 rounded-card border border-warn/40 bg-warn/10 px-4 py-3"
+            role="alert"
+        >
+            <BaseIcon
+                name="lock"
+                :size="16"
+                class="mt-0.5 shrink-0 text-warn"
+            />
+            <p class="flex-1 text-[14px] text-text">{{ session.billingMessage }}</p>
+            <button
+                type="button"
+                class="shrink-0 text-text-3 transition-colors hover:text-text"
+                aria-label="Dismiss message"
+                @click="onDismissBilling"
+            >
+                <BaseIcon
+                    name="x"
+                    :size="15"
+                />
+            </button>
+        </div>
+
         <!-- Profile -->
         <div class="mt-6 flex items-center gap-4 rounded-card border border-border bg-surface p-[calc(18px*var(--pad))]">
             <span class="flex size-12 shrink-0 items-center justify-center rounded-full bg-surface-3 text-[18px] font-bold text-text">
@@ -49,6 +74,16 @@
                 Plan
             </div>
             <p class="mt-3 text-[14px] text-text-2">{{ planLead }}</p>
+            <p
+                v-if="cancelNotice"
+                class="mt-2 flex items-center gap-1.5 text-[13px] font-medium text-warn"
+            >
+                <BaseIcon
+                    name="restart"
+                    :size="14"
+                />
+                {{ cancelNotice }}
+            </p>
             <div class="mt-4 flex flex-wrap gap-2.5">
                 <template v-if="isPro">
                     <BaseButton
@@ -214,6 +249,11 @@
             : `You’re on Free — ${caps.value.spaces} spaces, ${caps.value.items} items each, this device only.`
     );
 
+    const cancelNotice = computed(() => {
+        if (!session.cancellationScheduled || !session.proAccessUntilLabel) return '';
+        return `Pro until ${session.proAccessUntilLabel}, cancels then.`;
+    });
+
     const spaceCount = computed(() => store.count);
     const totalItems = computed(() => store.spaces.reduce((n, s) => n + s.items.length, 0));
     const fullestSpace = computed(() =>
@@ -242,7 +282,12 @@
         router.push({ name: 'pricing' });
     }
     function onDowngrade() {
-        session.setPlan('free');
+        // End-of-period cancel (FR-9): the store keeps Pro and records
+        // `proAccessUntil`; `cancelNotice` then shows "Pro until <date>, cancels then".
+        void session.setPlan('free');
+    }
+    function onDismissBilling() {
+        session.dismissBillingMessage();
     }
     function onToggleSync() {
         if (!limits.guard(limits.checkSync())) return;

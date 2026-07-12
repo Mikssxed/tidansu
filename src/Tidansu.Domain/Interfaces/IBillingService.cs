@@ -22,6 +22,13 @@ public class BillingChangeResult
 {
     public string? CheckoutUrl { get; init; }
 
+    // End-of-period cancel: the plan does NOT flip synchronously. The user keeps Pro
+    // until ProAccessUntil; the actual Free flip happens later via the provider webhook.
+    public bool CancellationScheduled { get; init; }
+    public DateTimeOffset? ProAccessUntil { get; init; }
+
     public static readonly BillingChangeResult Applied = new();
     public static BillingChangeResult Redirect(string url) => new() { CheckoutUrl = url };
+    public static BillingChangeResult ScheduledCancellation(DateTimeOffset until) =>
+        new() { CancellationScheduled = true, ProAccessUntil = until };
 }

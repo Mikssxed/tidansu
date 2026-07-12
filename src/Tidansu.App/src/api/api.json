@@ -918,11 +918,20 @@
           "checkoutUrl": {
             "type": "string",
             "nullable": true
+          },
+          "cancellationScheduled": {
+            "type": "boolean"
+          },
+          "proAccessUntil": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         },
         "additionalProperties": false,
         "required": [
-          "account"
+          "account",
+          "cancellationScheduled"
         ]
       },
       "ChangePlanResultApiOperationResult": {

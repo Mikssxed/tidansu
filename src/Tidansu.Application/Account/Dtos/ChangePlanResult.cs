@@ -6,4 +6,9 @@ public class ChangePlanResult
 {
     public AccountDto Account { get; set; } = null!;
     public string? CheckoutUrl { get; set; }
+
+    // End-of-period cancel (FR-9): the account stays Pro until ProAccessUntil; the
+    // frontend must show this instead of flipping to Free immediately.
+    public bool CancellationScheduled { get; set; }
+    public DateTimeOffset? ProAccessUntil { get; set; }
 }

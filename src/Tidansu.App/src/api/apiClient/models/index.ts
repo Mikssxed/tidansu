@@ -106,9 +106,17 @@ export interface ChangePlanResult extends Parsable {
      */
     account: AccountDto;
     /**
+     * The cancellationScheduled property
+     */
+    cancellationScheduled: boolean;
+    /**
      * The checkoutUrl property
      */
     checkoutUrl?: string | null;
+    /**
+     * The proAccessUntil property
+     */
+    proAccessUntil?: Date | null;
 }
 export interface ChangePlanResultApiOperationResult extends Parsable {
     /**
@@ -520,7 +528,9 @@ export function deserializeIntoChangePlanCommand(changePlanCommand: Partial<Chan
 export function deserializeIntoChangePlanResult(changePlanResult: Partial<ChangePlanResult> | undefined = {}) : Record<string, (node: ParseNode) => void> {
     return {
         "account": n => { changePlanResult.account = n.getObjectValue<AccountDto>(createAccountDtoFromDiscriminatorValue); },
+        "cancellationScheduled": n => { changePlanResult.cancellationScheduled = n.getBooleanValue(); },
         "checkoutUrl": n => { changePlanResult.checkoutUrl = n.getStringValue(); },
+        "proAccessUntil": n => { changePlanResult.proAccessUntil = n.getDateValue(); },
     }
 }
 /**
@@ -1098,7 +1108,9 @@ export function serializeChangePlanCommand(writer: SerializationWriter, changePl
 export function serializeChangePlanResult(writer: SerializationWriter, changePlanResult: Partial<ChangePlanResult> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
     if (!changePlanResult || isSerializingDerivedType) { return; }
     writer.writeObjectValue<AccountDto>("account", changePlanResult.account, serializeAccountDto);
+    writer.writeBooleanValue("cancellationScheduled", changePlanResult.cancellationScheduled);
     writer.writeStringValue("checkoutUrl", changePlanResult.checkoutUrl);
+    writer.writeDateValue("proAccessUntil", changePlanResult.proAccessUntil);
 }
 /**
  * Serializes information the current object

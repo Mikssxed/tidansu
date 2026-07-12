@@ -95,17 +95,39 @@ public static class ServiceCollectionExtensions
         services.AddMemoryCache();
         services.AddSingleton<IMagicLinkThrottle, MagicLinkThrottle>();
 
-        // Billing seam: Stripe when configured, otherwise a direct plan flip (dev/default).
+        // Billing seam selection (FR-2 — never a silent free Pro in production):
+        //   Enabled && IsConfigured  → StripeBillingService (real payments)
+        //   Enabled && !IsConfigured  → fail loud at startup (mirror the JWT/SMTP guards)
+        //   !Enabled  in Development  → DirectBillingService  (dev convenience: flip now)
+        //   !Enabled  in Production   → DisabledBillingService (deliberate off, no free Pro)
         services.Configure<StripeSettings>(configuration.GetSection("StripeSettings"));
-        var stripeSettings = configuration.GetSection("StripeSettings").Get<StripeSettings>();
-        if (stripeSettings?.IsConfigured == true)
+        var stripeSettings = configuration.GetSection("StripeSettings").Get<StripeSettings>() ?? new StripeSettings();
+        if (stripeSettings.Enabled)
         {
+            if (!stripeSettings.IsConfigured)
+            {
+                // Enabled but misconfigured → refuse to boot rather than fall back to a
+                // free-Pro path. Name the missing key(s); never echo the (secret) values.
+                var missing = new List<string>();
+                if (string.IsNullOrWhiteSpace(stripeSettings.SecretKey)) missing.Add("StripeSettings__SecretKey");
+                if (string.IsNullOrWhiteSpace(stripeSettings.WebhookSecret)) missing.Add("StripeSettings__WebhookSecret");
+                if (string.IsNullOrWhiteSpace(stripeSettings.ProPriceId)) missing.Add("StripeSettings__ProPriceId");
+                throw new InvalidOperationException(
+                    $"StripeSettings is Enabled but not fully configured. Set the {string.Join(" and ", missing)} environment variable(s).");
+            }
+
             services.AddScoped<IBillingService, StripeBillingService>();
         }
-        else
+        else if (environment.IsDevelopment())
         {
             services.AddScoped<IBillingService, DirectBillingService>();
         }
+        else
+        {
+            services.AddScoped<IBillingService, DisabledBillingService>();
+        }
+
+        services.AddScoped<IProcessedStripeEventStore, ProcessedStripeEventStore>();
 
         services.AddScoped<IRefreshTokensRepository, RefreshTokensRepository>();
         services.AddScoped<IMagicLinkTokensRepository, MagicLinkTokensRepository>();

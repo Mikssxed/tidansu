@@ -9,6 +9,7 @@ public class TidansuDbContext(DbContextOptions<TidansuDbContext> options) : Iden
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<MagicLinkToken> MagicLinkTokens { get; set; }
     public DbSet<Space> Spaces { get; set; }
+    public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,6 +38,20 @@ public class TidansuDbContext(DbContextOptions<TidansuDbContext> options) : Iden
         {
             user.Property(u => u.DisplayName).HasMaxLength(256);
             user.Property(u => u.Plan).HasConversion<string>().HasMaxLength(16);
+
+            // Stripe ids — indexed for the webhook lookup path (resolve account by
+            // subscription/customer id, never by email).
+            user.Property(u => u.StripeCustomerId).HasMaxLength(255);
+            user.Property(u => u.StripeSubscriptionId).HasMaxLength(255);
+            user.HasIndex(u => u.StripeSubscriptionId);
+            user.HasIndex(u => u.StripeCustomerId);
+        });
+
+        modelBuilder.Entity<ProcessedStripeEvent>(evt =>
+        {
+            evt.HasKey(e => e.Id);
+            evt.Property(e => e.Id).HasMaxLength(255);
+            evt.Property(e => e.Type).HasMaxLength(64);
         });
 
         modelBuilder.Entity<Space>(space =>
