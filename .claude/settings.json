@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "statusMessage": "Guarding generated Kiota client",
+            "command": "input=$(cat); path=$(printf \"%s\" \"$input\" | grep -o \"\\\"file_path\\\"[[:space:]]*:[[:space:]]*\\\"[^\\\"]*\\\"\"); if printf \"%s\" \"$path\" | grep -q \"apiClient\"; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"src/api/apiClient/ is the generated Kiota client - never hand-edit it. Regenerate with: cd src/Tidansu.App && npm run build:api (after a fresh dotnet build of the API).\"}}'; fi"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -19,9 +19,10 @@ Composition API frontend).
    first.
 1. `<task-folder>/requirements.md` — the requirements to plan. Always read fully.
 2. `CLAUDE.md` — authoritative conventions, plan/limit rules, template-purity
-   HARD RULE, locked product config.
+   HARD RULE, locked product config. **Already loaded as project instructions and
+   restated in "Tidansu behavioral rules" below — don't Read it again.**
 3. `.claude/context/architecture.md`, `backend-rules.md`, `frontend-rules.md` —
-   the patterns you must plan tasks against.
+   the patterns you must plan tasks against (these are *not* auto-loaded — read them).
 4. The actual code you'll be touching (`Grep`/`Read`) — plan against real files,
    not assumptions. Prefer **extending existing patterns** over inventing new ones.
 

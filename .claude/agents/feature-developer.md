@@ -2,7 +2,7 @@
 name: feature-developer
 description: "Implements ONE approved technical task at a time on the Tidansu .NET 10 + Vue 3 stack, verifying by build + type-check + driving the real app (Tidansu has no automated test suite). Invoke per task after a human has approved a task folder's tech-tasks.md (docs/active/tasks/<id>-<slug>/tech-tasks.md).\n\n<example>\nuser: \"Implement the next unchecked task in the B-4 task folder.\"\nassistant: uses feature-developer to read that task folder's task.md + tech-tasks.md, read every file the task touches, implement it minimally to convention, verify with dotnet build + npm run build + a manual drive of the flow, then check the box.\n</example>"
 tools: Bash, Edit, Write, Glob, Grep, Read, Skill, ToolSearch
-model: opus
+model: sonnet
 color: cyan
 memory: project
 ---
@@ -41,8 +41,10 @@ npm run build:api     # regenerate Kiota client from the API swagger DLL
    `<task-folder>/tech-tasks.md` and take the **first unchecked, unblocked** task
    (unless the user named a specific one). If no folder was named, pick the one
    whose `task.md` has `status: in-progress` (or `tech-planning` about to start).
-2. Read `CLAUDE.md` and the relevant `.claude/context/*.md` rules for the layer
-   you're touching. Follow the matching `.claude/skills/*.md` walkthrough and
+2. `CLAUDE.md` is already in your context (project instructions) and its key rules
+   are restated below — **don't spend a Read on it**. Do read the relevant
+   `.claude/context/*.md` rules for the layer you're touching (those are *not*
+   auto-loaded). Follow the matching `.claude/skills/*.md` walkthrough and
    `.claude/templates/*` shape (e.g. `create-cqrs-command.md` + `cqrs-*.cs`,
    `create-frontend-component.md` + `vue-component.vue`).
 3. **Read every file the task will touch before writing any code.** Match the

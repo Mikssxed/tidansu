@@ -11,6 +11,11 @@ this pipeline by dispatching each agent in turn and **pausing at every human
 gate**. Do not skip a gate. Do not run the next stage until the artifact from the
 previous stage exists and the human has approved it.
 
+> **Cost tip:** orchestration here is coordination only — dispatch, summarize,
+> gate. The real reasoning is delegated to model-tiered subagents (see
+> `.claude/agents/README.md`). Running *this* session on **Sonnet** (`/model
+> sonnet`) is cheaper with no quality loss; the agents still pick their own tier.
+
 If `$ARGUMENTS` is empty, read `docs/backlog.md` and propose the highest-priority
 `unprocessed` item, then confirm with the user before starting.
 
@@ -56,12 +61,28 @@ task, report status. Pause for the user if a task touches auth, billing, plan
 limits, or a schema migration — or if the developer surfaces an ambiguity/
 architectural constraint. Continue until all tasks in the folder are checked.
 
+> **Batch tightly-coupled tasks to cut cold-start cost.** Each dispatch is a fresh
+> agent that re-reads `task.md` + `tech-tasks.md` + the files it touches. When
+> several *adjacent, same-layer* tasks operate on the **same file(s)** (e.g. a CQRS
+> triplet, or a component + its composable) and none of them is a gated pause point
+> above, dispatch them as **one** developer run ("implement tasks 3–5") so that
+> context loads once. Keep tasks separate whenever they touch different files, cross
+> a layer boundary, or hit a pause condition — the one-coherent-diff-at-a-time rule
+> still holds.
+
 **Stage 4 — Review.** Dispatch the `branch-code-reviewer` agent (naming the task
-folder) to review the branch and write `<task-folder>/review.md`. If the feature
-touched auth, ownership, plan gating, billing, redirects, or file/photo handling,
-**also** dispatch the `security-reviewer` agent. Summarize the 🔴 Critical and
-🟠 Major findings and **STOP**: ask the user how to proceed (fix now via the
-developer agent, or accept and open a PR).
+folder) to review the branch and write `<task-folder>/review.md` — this is the
+**single default review**. If the feature touched auth, ownership, plan gating,
+billing, redirects, or file/photo handling, **also** dispatch the
+`security-reviewer` agent. Summarize the 🔴 Critical and 🟠 Major findings and
+**STOP**: ask the user how to proceed (fix now via the developer agent, or accept
+and open a PR).
+
+> **Don't stack reviews.** The `branch-code-reviewer` agent and the `/code-review`
+> skill (which itself fans out to two sub-agents) overlap heavily — running both
+> re-reads the same diff up to four times for little marginal signal. Use
+> `/code-review` as an **alternative** to the branch reviewer (e.g. when you
+> specifically want the Standards-vs-Spec split), not in addition to it.
 
 ## Rules
 
@@ -84,9 +105,10 @@ fan out into parallel sub-agents. Reach for these around the gates:
   **`design-an-interface`** (parallel interface exploration) or
   **`improve-codebase-architecture`** (deepening candidates) to inform the tech-lead
   plan. **`research`** for any library/API fact-finding the tech-lead needs.
-- **At Stage 4**, alongside the `branch-code-reviewer` agent, you may also run the
-  repo's **`/code-review`** skill (Standards + Spec in parallel sub-agents) for a
-  second, orthogonal read of the diff.
+- **At Stage 4**, choose **one** review path: the `branch-code-reviewer` agent
+  (default) *or* the repo's **`/code-review`** skill (Standards + Spec in parallel
+  sub-agents) — not both, they read the same diff. Add the `security-reviewer`
+  agent on top only for auth/billing/plan/redirect/photo diffs.
 - **Before declaring the feature done**, apply
   **`superpowers:verification-before-completion`** — evidence (green gates, a real
   drive) before any "it works" claim.

@@ -44,10 +44,11 @@ If `origin/main` is unavailable, fall back to:
 git diff main...HEAD
 git diff "$(git merge-base HEAD main)"..HEAD
 ```
-Read every changed file **in full context**, not just diff lines. Read
-`CLAUDE.md` and the `.claude/context/*.md` rules before judging conventions —
-something you'd flag may be a deliberate project rule. (Ignore
-`.claude/context/project-overview.md`; it's a stale SelfGrind leftover.)
+Read every changed file **in full context**, not just diff lines. `CLAUDE.md` is
+already in your context (project instructions) — don't re-Read it; do read the
+`.claude/context/*.md` rules before judging conventions, since something you'd flag
+may be a deliberate project rule. (Ignore `.claude/context/project-overview.md`;
+it's a stale SelfGrind leftover.)
 
 ## Step 2 — Review dimensions
 

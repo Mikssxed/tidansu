@@ -52,6 +52,26 @@ All paths below are inside the task folder `docs/active/tasks/<id>-<slug>/`.
 `/build-feature` (in `.claude/commands/`) is the orchestrator — it's a slash
 command, not an agent, because subagents can't spawn other subagents.
 
+## Model tiers (cost/effectiveness tuning)
+
+Not every stage needs Opus. We keep Opus only where deep reasoning changes the
+outcome **and** a mistake is expensive or hard to catch downstream; the rest run on
+Sonnet, protected by objective gates.
+
+| Agent | Model | Rationale |
+|---|---|---|
+| `tech-lead` | **opus** | Highest-leverage stage — a bad plan multiplies cost across every downstream dispatch. |
+| `branch-code-reviewer` | **opus** | Subtle-bug hunting; false negatives are invisible and costly. |
+| `security-reviewer` | **opus** | High-stakes (IDOR, plan-bypass, billing) with no mechanical safety net. |
+| `feature-developer` | **sonnet** | Highest-volume agent (per-task cold starts + drives the app), but tightly scoped with hard gates (`dotnet build`, `vue-tsc`, drive-the-app) that catch errors mechanically. |
+| `design-ui-engineer` | **sonnet** | Component codegen against strict, well-specified rules with a `vue-tsc` gate. |
+| `pm-requirements-analyst` | **sonnet** | Structured business-language writing into a fixed template; no code reasoning. |
+
+Rule of thumb when adding an agent: **Sonnet if an objective gate verifies its
+output; Opus if nothing downstream mechanically catches a weak result.** Don't drop
+reasoning-only stages (requirements/planning/review) to Haiku — they have no safety
+net.
+
 ## Conventions baked into every agent
 
 - **Domain = spatial inventory** (spaces → zones → items, expiry). *Ignore

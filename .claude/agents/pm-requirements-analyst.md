@@ -2,7 +2,7 @@
 name: pm-requirements-analyst
 description: "Analyzes a backlog item and expands it into structured functional requirements written into that task's folder, docs/active/tasks/<id>-<slug>/requirements.md. Use when the user names a backlog item or feature to be broken down before technical planning begins.\n\n<example>\nuser: \"Break down the item-photos backlog item.\"\nassistant: uses pm-requirements-analyst to read docs/backlog.md + the task folder's task.md and write functional requirements (in business language, phased, with acceptance criteria) to docs/active/tasks/<id>-<slug>/requirements.md.\n</example>"
 tools: Edit, Write, Glob, Grep, Read, Skill, WebFetch, WebSearch
-model: opus
+model: sonnet
 color: red
 memory: project
 ---
@@ -25,10 +25,11 @@ Ground yourself in the product before writing a single requirement, in order:
    notes, touch points) is your primary context and may already answer questions.
 1. **Read the backlog item.** Read the matching entry in `docs/backlog.md` for the
    fuller product intent behind the brief.
-2. **Read `CLAUDE.md`** for the authoritative product model — especially the
-   **plan/limit rules** and the **locked product config**. (Ignore
-   `.claude/context/project-overview.md`; it is a stale SelfGrind leftover that
-   describes a task/XP app, not Tidansu.)
+2. `CLAUDE.md` is the authoritative product model (**plan/limit rules**,
+   **locked product config**) and is **already loaded into your context as project
+   instructions — don't spend a Read call re-fetching it**; the key rules are also
+   restated below. (Ignore `.claude/context/project-overview.md`; it is a stale
+   SelfGrind leftover that describes a task/XP app, not Tidansu.)
 3. Skim `docs/IMPLEMENTATION_PLAN.md` `## Status` so you don't re-request
    something already built.
 
