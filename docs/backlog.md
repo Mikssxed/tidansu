@@ -69,7 +69,7 @@ _Touch points:_ `src/Tidansu.Infrastructure/Services/EmailService.cs`,
 
 ### [B-5] Legal & compliance to charge customers in Poland (research)
 **Priority**: P1
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-12 — research delivered: `docs/legal/poland-payments-compliance.md`; see `docs/active/tasks/B-5-poland-payments-legal-research/`. **Verdict:** Stripe does tax calc/collection/invoicing worldwide but registration + filing + KSeF stay the owner's job; PL-specific numbers flagged lower-confidence for accountant/lawyer to confirm before B-6 goes live.)
 Before connecting real payments we need to know whether — and under what
 conditions — the owner (based in Poland) can legally sell a paid SaaS
 subscription to customers. This is a **research write-up**, not a code feature:
@@ -83,7 +83,12 @@ code.
 
 ### [B-6] Connect real Stripe (test-mode in dev, live in prod)
 **Priority**: P2 (after B-5)
-**Status**: unprocessed
+**Status**: ✅ code-complete (2026-07-12 — built, reviewed & hardened; see
+`docs/active/tasks/B-6-connect-real-stripe/`. No Critical review findings; 3 Major +
+Minor all fixed. **Pending owner action**: run the Stripe **test-mode** verification
+drives per `SETUP.md` (needs a Stripe account + `sk_test_` keys + Stripe CLI + LocalDB)
+before marking `done`. **Live cutover** is a further gate — see `go-live-cutover.md` +
+B-5 §10/§11.)
 The Stripe billing seam already exists (`StripeBillingService` + checkout +
 `/api/billing/webhook`) but is off by default and has never been tested against a
 real Stripe account. Connect a real Stripe account so upgrades genuinely charge:
@@ -121,6 +126,39 @@ critical/major issues are follow-up tasks. Best run with the `security-reviewer`
 agent plus the branch reviewer.
 _Touch points:_ whole codebase; EF queries/indexes in `Tidansu.Infrastructure`,
 controllers/handlers, auth & billing surfaces, `TidansuDbContext`.
+
+### [B-9] Harden the Stripe webhook endpoint (rate-limit + body cap)
+**Priority**: P3
+**Status**: unprocessed
+Follow-up from the B-6 security review. The Stripe webhook (`/api/billing/webhook`) is
+necessarily `[AllowAnonymous]`, so signature verification is its only gate. Add
+defence-in-depth so a flood of junk payloads can't tie up the app: a per-endpoint rate
+limit and a maximum request-body size (reject oversized bodies before reading). Low risk
+today, but cheap insurance on an internet-facing anonymous endpoint.
+_Touch points:_ `src/Tidansu.API/Controllers/BillingController.cs`, `Program.cs`
+(rate-limiter + request-size limits).
+
+### [B-10] Handle delayed/async Stripe payment methods
+**Priority**: P3
+**Status**: unprocessed
+Follow-up from B-6. Pro is granted only when `checkout.session.completed` reports
+`PaymentStatus == "paid"` (correct for cards). Delayed-notification methods (e.g. SEPA
+debit, some wallets) can complete checkout with payment still pending, then settle later —
+so those buyers would pay and never get Pro. If/when such methods are enabled, handle
+`checkout.session.async_payment_succeeded` (grant Pro on settlement) and
+`checkout.session.async_payment_failed` (leave on Free). Not needed while card-only.
+_Touch points:_ `src/Tidansu.Infrastructure/Services/StripeBillingService.cs` (webhook
+event dispatch).
+
+### [B-11] Bump dependencies flagged by NU1903 advisories
+**Priority**: P3
+**Status**: unprocessed
+The build surfaces `NU1903` known-vulnerability advisories on transitive/direct packages:
+`AutoMapper 12.0.1`, `System.Security.Cryptography.Xml 9.0.0`, and `Microsoft.OpenApi 2.4.1`.
+None are B-6-specific — they pre-date it — but they should be reviewed and bumped to patched
+versions (minding the Swashbuckle/OpenApi version-match constraint that the Kiota regen
+tooling depends on). Verify build + a Kiota regen still work after the bump.
+_Touch points:_ `*.csproj` package references; re-verify `npm run build:api`.
 
 ---
 

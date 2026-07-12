@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Tidansu.Domain.Entities;
 using Tidansu.Domain.Enums;
 using Tidansu.Domain.Exceptions;
@@ -13,6 +14,12 @@ public class UserService(UserManager<User> userManager) : IUserService
 
     public Task<User?> FindByIdAsync(string id, CancellationToken cancellationToken = default)
         => userManager.FindByIdAsync(id);
+
+    public Task<User?> FindByStripeSubscriptionIdAsync(string subscriptionId, CancellationToken cancellationToken = default)
+        => userManager.Users.FirstOrDefaultAsync(u => u.StripeSubscriptionId == subscriptionId, cancellationToken);
+
+    public Task<User?> FindByStripeCustomerIdAsync(string customerId, CancellationToken cancellationToken = default)
+        => userManager.Users.FirstOrDefaultAsync(u => u.StripeCustomerId == customerId, cancellationToken);
 
     public async Task<User> CreateAsync(string email, string displayName, CancellationToken cancellationToken = default)
     {

@@ -50,18 +50,44 @@
             </div>
         </div>
 
+        <!-- Downgrade scheduled / billing notices -->
+        <div
+            v-if="showDowngradeNotice"
+            class="mt-8 flex items-start gap-2.5 rounded-card border border-pro/30 bg-pro/5 px-4 py-3"
+            role="status"
+        >
+            <BaseIcon
+                name="sparkle"
+                :size="16"
+                class="mt-0.5 shrink-0 text-pro"
+            />
+            <p class="text-[14px] text-text">{{ downgradeNotice }}</p>
+        </div>
+        <div
+            v-if="session.billingMessage"
+            class="mt-8 flex items-start gap-2.5 rounded-card border border-warn/40 bg-warn/10 px-4 py-3"
+            role="alert"
+        >
+            <BaseIcon
+                name="lock"
+                :size="16"
+                class="mt-0.5 shrink-0 text-warn"
+            />
+            <p class="text-[14px] text-text">{{ session.billingMessage }}</p>
+        </div>
+
         <!-- Plan cards -->
         <div class="mt-8 grid gap-4 sm:grid-cols-2">
             <PlanCard
                 :plan="freePlan"
                 :billing="billing"
-                :current="currentPlan === 'free'"
+                :current="isFreePlanCurrent"
                 @choose="onDowngrade"
             />
             <PlanCard
                 :plan="proPlan"
                 :billing="billing"
-                :current="currentPlan === 'pro'"
+                :current="isProPlanCurrent"
                 @choose="onUpgrade"
             />
         </div>
@@ -108,12 +134,21 @@
                 <p class="mt-1.5 text-[14px] leading-relaxed text-text-2">{{ faq.a }}</p>
             </div>
         </div>
+
+        <CheckoutConsentStep
+            :open="consentModal.isOpen.value"
+            @confirm="onConsentConfirm"
+            @close="onConsentClose"
+        />
     </div>
 </template>
 
 <script setup lang="ts">
     import { BaseIcon } from '@/components/base';
+    import CheckoutConsentStep from '@/components/pricing/CheckoutConsentStep.vue';
     import PlanCard from '@/components/pricing/PlanCard.vue';
+    import { checkoutConsentEnabled } from '@/config/featureFlags';
+    import { useModal } from '@/composables/useModal';
     import { PLAN_FEATURES, planOf } from '@/data/plans';
     import type { Plan } from '@/data/types';
     import { useSessionStore } from '@/stores/useSessionStore';
@@ -122,12 +157,16 @@
 
     const session = useSessionStore();
     const router = useRouter();
+    const consentModal = useModal();
 
     const billing = ref<'month' | 'year'>('year');
+    const downgradeRequested = ref(false);
 
     const freePlan = computed(() => planOf('free'));
     const proPlan = computed(() => planOf('pro'));
     const currentPlan = computed<Plan>(() => session.plan);
+    const isFreePlanCurrent = computed(() => currentPlan.value === 'free');
+    const isProPlanCurrent = computed(() => currentPlan.value === 'pro');
 
     const monthClass = computed(() =>
         billing.value === 'month' ? 'bg-surface-3 text-text' : 'text-text-2 hover:text-text'
@@ -160,6 +199,15 @@
         },
     ];
 
+    const downgradeNotice = computed(() => {
+        if (!session.proAccessUntilLabel) return '';
+        return `You’ll keep Pro until ${session.proAccessUntilLabel}, then switch to Free.`;
+    });
+
+    const showDowngradeNotice = computed(
+        () => downgradeRequested.value && session.cancellationScheduled && downgradeNotice.value !== ''
+    );
+
     function setBilling(value: 'month' | 'year') {
         billing.value = value;
     }
@@ -178,16 +226,43 @@
             router.push({ name: 'login', query: { returnUrl: '/pricing' } });
             return;
         }
-        session.setPlan('pro');
+        // Gate Checkout behind the consumer-law consent step when the flag is on;
+        // otherwise proceed straight to the billing seam (existing happy path).
+        if (checkoutConsentEnabled) {
+            consentModal.open();
+            return;
+        }
+        void proceedUpgrade();
+    }
+
+    async function proceedUpgrade() {
+        await session.setPlan('pro');
+        // A billing error keeps the user here to read the surfaced message; on
+        // success the seam either redirects to Checkout or the flip stands.
+        if (session.billingMessage) return;
         returnToOrigin();
     }
 
-    function onDowngrade() {
+    function onConsentConfirm() {
+        consentModal.close();
+        void proceedUpgrade();
+    }
+
+    function onConsentClose() {
+        consentModal.close();
+    }
+
+    async function onDowngrade() {
         if (!session.isAuthenticated) {
             router.push({ name: 'login', query: { returnUrl: '/pricing' } });
             return;
         }
-        session.setPlan('free');
+        downgradeRequested.value = true;
+        await session.setPlan('free');
+        if (session.billingMessage) return;
+        // End-of-period cancel (FR-9): stay and show "Pro until <date>" instead of
+        // an immediate switch. A direct/dev downgrade has no schedule → return.
+        if (session.cancellationScheduled) return;
         returnToOrigin();
     }
 </script>

@@ -12,5 +12,13 @@ public class User : IdentityUser
     public Plan Plan { get; set; } = Plan.Free;
     public bool SyncOn { get; set; }
 
+    // Stripe billing state. All nullable/defaulted so existing rows migrate cleanly.
+    // Ids map later subscription lifecycle events back to this account (never by email);
+    // CurrentPeriodEnd/CancelAtPeriodEnd drive the end-of-period cancel UX.
+    public string? StripeCustomerId { get; set; }
+    public string? StripeSubscriptionId { get; set; }
+    public DateTimeOffset? CurrentPeriodEnd { get; set; }
+    public bool CancelAtPeriodEnd { get; set; }
+
     public List<RefreshToken> RefreshTokens { get; set; } = [];
 }

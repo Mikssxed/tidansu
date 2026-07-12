@@ -24,9 +24,11 @@ public class ChangePlanCommandHandler(
 
         var target = request.Plan == "pro" ? Plan.Pro : Plan.Free;
 
-        // The billing seam decides whether this applies now or needs a checkout
-        // redirect (Stripe upgrade). Downgrade keeps all data — over-cap content
-        // just becomes read-only on the next UpdateSpace.
+        // The billing seam decides the outcome: apply now, redirect to checkout
+        // (Stripe upgrade), or schedule an end-of-period cancellation (the plan stays
+        // Pro until ProAccessUntil and flips later via webhook — not synchronously).
+        // Downgrade keeps all data — over-cap content just becomes read-only once it
+        // takes effect.
         logger.LogInformation("Plan change requested for user {UserId}: {From} → {To}", userId, user.Plan, target);
         var result = await billing.ChangePlanAsync(user, target, cancellationToken);
 
@@ -35,6 +37,8 @@ public class ChangePlanCommandHandler(
         {
             Account = AccountDto.From(user, UsageDto.From(userSpaces)),
             CheckoutUrl = result.CheckoutUrl,
+            CancellationScheduled = result.CancellationScheduled,
+            ProAccessUntil = result.ProAccessUntil,
         };
     }
 }

@@ -138,6 +138,27 @@ public class ErrorHandlingMiddleware(ILogger<ErrorHandlingMiddleware> logger) : 
 
             await context.Response.WriteAsJsonAsync(errorResponse);
         }
+        catch (BillingUnavailableException ex)
+        {
+            // Billing is deliberately off or misconfigured. Fail clearly (never a silent
+            // free upgrade, never a crash); the account stays on its current plan. Logged
+            // at Warning without echoing any config; the client gets a generic message.
+            logger.LogWarning(ex, "Billing unavailable");
+
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            context.Response.ContentType = "application/json";
+
+            var errorResponse = new ApiOperationResult
+            {
+                IsSuccess = false,
+                Errors = new Dictionary<string, string[]>
+                {
+                    { ApiOperationResult.GeneralErrorKey, new[] { "Billing is currently unavailable." } }
+                }
+            };
+
+            await context.Response.WriteAsJsonAsync(errorResponse);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, ex.Message);
