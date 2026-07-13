@@ -22,10 +22,20 @@ docs/active/tasks/<id>-<slug>/task.md   ← compact brief + status:, every agent
       │  feature-developer   (ONE task at a time; dotnet build + npm run build + drive app)
       ▼
    working code               ──[all tasks checked]──┐
-      │  branch-code-reviewer  (+ security-reviewer if auth/billing/plan/redirect/photo)
+      │  branch-code-reviewer  (+ security-reviewer if the diff changes auth/billing/plan/redirect/photo *logic or data flow*)
       ▼
 .../<id>-<slug>/review.md
 ```
+
+**Right-size the pipeline to the task.** The full four-stage / six-agent flow is
+built for a *feature build*. A verification/hardening sweep, a small config/copy
+change, or a one-file fix should run a **light path** — a short requirements note,
+one developer run for the whole coherent diff, and a **single** reviewer with
+trivial findings applied **inline** by the orchestrator (no fresh developer for
+~15 lines). Reserve the full path — and the second (security) reviewer — for diffs
+that change real logic on a sensitive surface, add/alter a contract or schema, or
+span many files/layers. `/build-feature` judges this twice: a first guess from the
+backlog item, a firm call once `tech-tasks.md` reveals the true size.
 
 **One folder per task** (`docs/active/tasks/<id>-<slug>/`) is the unit of work and
 the single source of context — see `docs/active/tasks/README.md`. Each stage reads

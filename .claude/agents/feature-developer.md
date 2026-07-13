@@ -64,11 +64,23 @@ anticipate → **stop and surface it.** No silent scope changes.
    Never hand-edit `src/api/apiClient/`.
 4. If you added/changed an entity field or the DbContext model: create the EF
    migration (command above) and confirm it builds.
-5. **Behavioural gate:** drive the real flow end-to-end (use the `verify` / `run`
-   skills). Start the API, start Vite, exercise the exact user path the task
-   enables. For anything plan-gated, verify **both** the allowed path and the
-   **cap path** (paywall opens with the right `reason`), plus downgrade
-   read-only behaviour where relevant. Report what you did and what you saw.
+5. **Behavioural gate — match depth to risk (don't gold-plate).** Drive the real
+   flow (use the `verify` / `run` skills), but scale *how far* to the change:
+   - **Logic on a live data path** (a handler, plan-cap check, ownership rule, a
+     mutation, billing/webhook flow) → drive it end-to-end in the running app, and
+     for anything plan-gated verify **both** the allowed path **and** the **cap
+     path** (paywall opens with the right `reason`) plus downgrade read-only.
+   - **Config / startup-guard / logging / build-hygiene change** (a fail-loud guard,
+     a bound config value, a log level, a bundle-content check) → the high-signal
+     proof is usually a **targeted boot/inspection**, not a full authenticated UI
+     drive: boot under the relevant environment and confirm the guard fires / the
+     value binds / the artifact is clean. Don't stand up a headless-browser journey
+     or hand-roll external-service stubs to prove a config edit — that spends far
+     more than the confidence it adds, especially when the end-to-end leg is already
+     gated on an owner/provider action.
+   Pick the lightest verification that actually *proves the change*, then report
+   exactly what you ran and what you saw (and what you deliberately did not run, and
+   why). Never claim a drive you didn't perform.
 6. Refactor only within the task's scope, then re-run the gates.
 
 ## Tidansu-specific rules
