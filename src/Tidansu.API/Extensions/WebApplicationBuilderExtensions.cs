@@ -66,6 +66,17 @@ public static class WebApplicationBuilderExtensions
 
         // CORS — the Vite dev server is a separate origin (the prod SPA is same-origin from wwwroot).
         var frontendUrl = builder.Configuration["AppSettings:FrontendUrl"];
+
+        // A blank FrontendUrl breaks magic-link + Checkout return URLs and leaves CORS with a
+        // zero-origin policy, so fail loud rather than boot half-broken. Scoped to !IsDevelopment()
+        // (not just IsProduction()) so a mis-named non-dev environment (e.g. Staging) still fails
+        // loud instead of silently skipping the guard; Development/the swagger CLI still boot blank.
+        if (!builder.Environment.IsDevelopment() && string.IsNullOrWhiteSpace(frontendUrl))
+        {
+            throw new InvalidOperationException(
+                "AppSettings:FrontendUrl is missing. Set the AppSettings__FrontendUrl environment variable.");
+        }
+
         builder.Services.AddCors(options =>
         {
             options.AddPolicy(FrontendCorsPolicy, policy =>

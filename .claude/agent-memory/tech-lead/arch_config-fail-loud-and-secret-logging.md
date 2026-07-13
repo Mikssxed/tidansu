@@ -23,4 +23,22 @@ account-takeover material.
 - Delivery/provider failures → throw a sanitized domain exception (recipient only),
   map it in `ErrorHandlingMiddleware` to a generic 5xx; never log the email body,
   magic link, token, or credential. Related: [[email-magic-link-delivery-seam]].
+- **Forwarded-headers / rate-limiter proxy trust is a security seam, not just
+  config.** `Program.cs` `UseForwardedHeaders` resolves the real client IP that the
+  magic-link/auth rate limiter partitions on. `KnownProxies`/`KnownNetworks` must be
+  **env-driven** (deploy-time value, topology-dependent) and the binding code must
+  **only add** parsed entries — never `.Clear()`-then-trust-all, never accept a
+  wildcard/`0.0.0.0/0`, and blank config must fall back to the framework
+  loopback-only default (fail safe). A wildcard here lets any client spoof
+  `X-Forwarded-For` and dodge the limiter entirely. Framework default (loopback
+  only) means one shared bucket for all users behind a real proxy — so it's an
+  explicit **open deploy step**, not "done", until the prod proxy address is known.
+  The `// SECURITY (B-7)` comment in `Program.cs` marks this seam.
+- **Fail-loud guards are Production-only.** They gate on
+  `builder.Environment.IsProduction()` / `environment.IsProduction()` so the swagger
+  CLI + Development still boot with a blank connection string / blank config (the
+  Kiota-regen running-app fallback depends on this). As of B-7 the guarded prod-
+  required keys are: `JwtSettings:Secret`, SMTP creds, Stripe-when-`Enabled`,
+  `AppSettings:FrontendUrl` (builds magic-link + Checkout return URLs), and the
+  `TidansuDb` connection string.
 </content>

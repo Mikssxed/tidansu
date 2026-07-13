@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Tidansu.Application.Extensions;
@@ -27,15 +28,64 @@ if (!string.IsNullOrEmpty(connectionString))
 // per-IP rate limiter partitions on the actual client (not the proxy) behind a reverse
 // proxy / load balancer. Runs first so every downstream component sees the corrected IP.
 //
-// SECURITY (B-7): KnownProxies/KnownNetworks are left at the framework default (loopback
-// only), so forwarded headers are trusted ONLY from a loopback proxy — an arbitrary
-// client CANNOT spoof X-Forwarded-For to dodge the limiter. The real production proxy's
-// address(es)/network(s) MUST be added to KnownProxies/KnownNetworks at deploy time
-// (task B-7), otherwise the forwarded IP will be ignored and every user shares one bucket.
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+// SECURITY (B-7): KnownProxies/KnownNetworks are bound from config (ForwardedHeaders__KnownProxies
+// / ForwardedHeaders__KnownNetworks below) so forwarded headers are trusted ONLY from an explicitly
+// configured proxy. When both are blank, this falls back to the framework default (loopback only) —
+// an arbitrary client still CANNOT spoof X-Forwarded-For to dodge the limiter. The real production
+// proxy's address(es)/network(s) are a deploy-time value: set them via the env vars above once the
+// production topology is known (task B-7); a wildcard ("*", "0.0.0.0/0", "::/0", "::" — trimmed,
+// case-insensitive) is rejected at startup, and a malformed entry fails loud naming the config key
+// instead of a bare FormatException. Networks bind to
+// options.KnownIPNetworks (the non-obsolete System.Net.IPNetwork-based property) — KnownNetworks
+// is deprecated (ASPDEPR005) but the config key stays "KnownNetworks" for operator readability.
+var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
-});
+};
+
+var knownProxies = builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [];
+var knownNetworks = builder.Configuration.GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>() ?? [];
+
+foreach (var proxy in knownProxies)
+{
+    var trimmedProxy = proxy.Trim();
+    if (string.Equals(trimmedProxy, "*", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "ForwardedHeaders:KnownProxies must not contain a wildcard (\"*\"). List explicit proxy IP addresses.");
+    }
+
+    if (!IPAddress.TryParse(trimmedProxy, out var proxyAddress))
+    {
+        throw new InvalidOperationException(
+            $"ForwardedHeaders:KnownProxies contains an invalid IP address: '{proxy}'.");
+    }
+
+    forwardedHeadersOptions.KnownProxies.Add(proxyAddress);
+}
+
+foreach (var network in knownNetworks)
+{
+    var trimmedNetwork = network.Trim();
+    if (string.Equals(trimmedNetwork, "*", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(trimmedNetwork, "0.0.0.0/0", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(trimmedNetwork, "::/0", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(trimmedNetwork, "::", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+            "ForwardedHeaders:KnownNetworks must not contain a wildcard (\"*\", \"0.0.0.0/0\", \"::/0\", or \"::\"). List explicit CIDR ranges.");
+    }
+
+    if (!System.Net.IPNetwork.TryParse(trimmedNetwork, out var parsedNetwork))
+    {
+        throw new InvalidOperationException(
+            $"ForwardedHeaders:KnownNetworks contains an invalid CIDR range: '{network}'.");
+    }
+
+    forwardedHeadersOptions.KnownIPNetworks.Add(parsedNetwork);
+}
+
+app.UseForwardedHeaders(forwardedHeadersOptions);
 
 app.UseMiddleware<ErrorHandlingMiddleware>();
 

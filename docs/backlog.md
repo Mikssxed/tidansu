@@ -103,7 +103,14 @@ config; possibly Kiota regen if the billing contract changes.
 
 ### [B-7] Production-readiness sweep
 **Priority**: P2
-**Status**: unprocessed
+**Status**: ✅ code-complete (2026-07-13 — swept, hardened, reviewed; see
+`docs/active/tasks/B-7-production-readiness-sweep/`. **No Critical/Major** in either the
+branch or security review; 4 config-hardening edits (fail-loud guards on `FrontendUrl` +
+DB connection, env-driven forwarded-header trust, EF-log level) + a proof checklist.
+Review nits F1/F2/F3 all fixed & re-verified by driving. **Pending owner action** (per the
+"run now, mark E2E pending" decision, recorded in `proof-checklist.md`): FR-2 real email
+delivery needs Brevo (B-4); FR-3 live Stripe test-mode purchase needs the B-6 drive; FR-10
+real proxy address is an open deploy step. Changes left uncommitted.)
 Once the real integrations (B-4, B-6) are in, do a focused pass to make a deployed
 build genuinely work end-to-end: verify every core flow on a prod-like config
 (auth → spaces/zones/items → plan caps/paywall → billing), ensure all

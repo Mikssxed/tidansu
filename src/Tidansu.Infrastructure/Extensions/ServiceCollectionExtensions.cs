@@ -20,6 +20,18 @@ public static class ServiceCollectionExtensions
     public static void AddInfrastructure(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
         var connectionString = configuration.GetConnectionString("TidansuDb");
+
+        // A blank connection string would let the app boot, skip the migration (Program.cs), and
+        // 500 on the first request — fail loud instead. Scoped to !IsDevelopment() (not just
+        // IsProduction()) so a mis-named non-dev environment (e.g. Staging) still fails loud instead
+        // of silently skipping the guard; Development/the swagger CLI still boot with an empty
+        // connection string.
+        if (!environment.IsDevelopment() && string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "ConnectionStrings:TidansuDb is missing. Set the ConnectionStrings__TidansuDb environment variable.");
+        }
+
         services.AddDbContext<TidansuDbContext>(options =>
         {
             options.UseSqlServer(connectionString);
