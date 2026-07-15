@@ -175,6 +175,7 @@
     import ComplexityViz from '@/components/onboarding/ComplexityViz.vue';
     import OnboardingStepBar from '@/components/onboarding/OnboardingStepBar.vue';
     import { zoneBgClasses } from '@/composables/useColorVariant';
+    import { useLimits } from '@/composables/useLimits';
     import { COMPLEXITY, DEFAULT_NAME, seedForType } from '@/data/onboarding';
     import { buildZones, SPACE_TYPES, spaceTypeDef, zoneName, type Complexity } from '@/data/spaces';
     import type { SpaceTypeId, Zone } from '@/data/types';
@@ -184,6 +185,7 @@
 
     const store = useSpacesStore();
     const router = useRouter();
+    const limits = useLimits();
 
     const step = ref(1);
     const type = ref<SpaceTypeId | null>(null);
@@ -244,6 +246,10 @@
 
     function finish() {
         if (!type.value) return;
+        // Mirror DashboardView.goCreate: block completing onboarding once the space
+        // cap is reached (e.g. reaching /spaces/new directly at the cap) so we open
+        // the paywall instead of an optimistic create-then-vanish. Server enforces too.
+        if (!limits.guard(limits.checkAddSpace())) return;
         const space = seedForType(type.value, name.value.trim() || defaultName.value, complexity.value);
         store.addSpace(space);
         store.currentId = space.id;

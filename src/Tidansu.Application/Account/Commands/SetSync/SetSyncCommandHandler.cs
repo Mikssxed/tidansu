@@ -34,7 +34,7 @@ public class SetSyncCommandHandler(
             await userService.UpdateAsync(user, cancellationToken);
         }
 
-        var userSpaces = await spaces.GetAllByUserAsync(userId, cancellationToken);
-        return AccountDto.From(user, UsageDto.From(userSpaces));
+        var itemCountsPerSpace = await spaces.GetItemCountsPerSpaceAsync(userId, cancellationToken);
+        return AccountDto.From(user, UsageDto.From(itemCountsPerSpace));
     }
 }

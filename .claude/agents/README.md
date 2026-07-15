@@ -4,7 +4,11 @@ A four-stage feature pipeline, ported from a FastAPI/React setup and retargeted 
 Tidansu's **.NET 10 Clean Architecture + CQRS** backend and **Vue 3** frontend,
 plus two specialist reviewers and a design engineer. Every agent is tuned to this
 repo's conventions (`CLAUDE.md` + `.claude/context/*.md`) and **verifies by build
-+ type-check + driving the app** — this repo has no automated test suite.
++ type-check + driving the app** — there is no integration or E2E suite, so a real
+drive is the bar for anything with a runtime surface. The one exception is
+`tests/Tidansu.Domain.Tests`, an xUnit project covering **pure Domain logic only**
+(`PlanPolicy`, `PhotoPolicy`). Pure, dependency-free Domain rules belong there and
+must ship with tests; everything else is still proven by driving.
 
 ## The pipeline
 

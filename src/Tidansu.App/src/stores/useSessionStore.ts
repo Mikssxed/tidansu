@@ -38,6 +38,9 @@ function load(): PersistedSession {
 const BILLING_UNAVAILABLE_MESSAGE =
     'Billing is currently unavailable. Your plan is unchanged — please try again later.';
 
+const SYNC_UNAVAILABLE_MESSAGE =
+    "Couldn't update sync right now — the setting is unchanged. Please try again later.";
+
 /**
  * Holds the signed-in user's profile/plan/sync. Populated from the backend's
  * magic-link `AuthResponse` (see `useAuth`); the JWT itself lives in
@@ -155,8 +158,15 @@ export const useSessionStore = defineStore('session', () => {
 
     /** Optimistically set sync and persist it (the caller pre-checks the Pro gate). */
     function setSync(on: boolean): void {
+        const previous = syncOn.value;
         syncOn.value = on;
-        void account.setSync(on).catch((e) => console.error('[session] sync change failed', e));
+        void account.setSync(on).catch((e) => {
+            // Revert the optimistic flip so the toggle matches the server, and
+            // surface it the same way plan changes do rather than only logging.
+            syncOn.value = previous;
+            billingMessage.value = SYNC_UNAVAILABLE_MESSAGE;
+            console.error('[session] sync change failed', e);
+        });
     }
 
     return {

@@ -14,6 +14,8 @@ export interface WebhookRequestBuilder extends BaseRequestBuilder<WebhookRequest
      * @param requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @returns {Promise<ArrayBuffer>}
      * @throws {ProblemDetails} error when the service returns a 400 status code
+     * @throws {ProblemDetails} error when the service returns a 413 status code
+     * @throws {ProblemDetails} error when the service returns a 429 status code
      */
      post(requestConfiguration?: RequestConfiguration<object> | undefined) : Promise<ArrayBuffer | undefined>;
     /**
@@ -35,6 +37,8 @@ export const WebhookRequestBuilderRequestsMetadata: RequestsMetadata = {
         responseBodyContentType: "application/json, text/plain;q=0.9",
         errorMappings: {
             400: createProblemDetailsFromDiscriminatorValue as ParsableFactory<Parsable>,
+            413: createProblemDetailsFromDiscriminatorValue as ParsableFactory<Parsable>,
+            429: createProblemDetailsFromDiscriminatorValue as ParsableFactory<Parsable>,
         },
         adapterMethodName: "sendPrimitive",
         responseBodyFactory:  "ArrayBuffer",

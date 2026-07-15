@@ -17,4 +17,12 @@
       <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
     </ItemGroup>
 
+    <!-- B-11: NU1903 for AutoMapper 12.0.1 (GHSA-rvv3-g6hj-g44x) is suppressed as an interim
+         decision. Clearing it requires AutoMapper >= 15.1.1, which mandates a commercial
+         license (Lucky Penny) and a breaking DI-registration change. Revisit once the
+         licensing/ownership call is made (see docs/active/tasks/B-11-bump-vulnerable-deps). -->
+    <ItemGroup>
+      <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-rvv3-g6hj-g44x" />
+    </ItemGroup>
+
 </Project>

@@ -18,7 +18,7 @@ public class GetAccountQueryHandler(
         var user = await userService.FindByIdAsync(userId, cancellationToken)
             ?? throw new AuthenticationException("user not found");
 
-        var userSpaces = await spaces.GetAllByUserAsync(userId, cancellationToken);
-        return AccountDto.From(user, UsageDto.From(userSpaces));
+        var itemCountsPerSpace = await spaces.GetItemCountsPerSpaceAsync(userId, cancellationToken);
+        return AccountDto.From(user, UsageDto.From(itemCountsPerSpace));
     }
 }

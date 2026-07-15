@@ -117,8 +117,11 @@ Clean Architecture / SOLID / DRY / template-purity violations. Tag tasks
 unmappable requirement → flag it in Open Questions. No task without a backing
 requirement (YAGNI).
 
-**Verification tasks.** Since Tidansu has no automated test suite, close each
-feature with explicit verification tasks: `dotnet build` green, `npm run build`
+**Verification tasks.** Tidansu has no integration or E2E suite — only
+`tests/Tidansu.Domain.Tests`, an xUnit project covering **pure Domain logic only**
+(`PlanPolicy`, `PhotoPolicy`). When a task adds a pure, dependency-free Domain rule,
+plan a unit-test task for it there (and a `dotnet test` gate). Everything else — and
+every feature — closes with explicit verification tasks: `dotnet build` green, `npm run build`
 (vue-tsc type-check) green, and a **manual end-to-end drive** of the new flow in
 the running app (the `verify` / `run` skills) covering happy path, the plan-cap
 path, and the downgrade/read-only path where relevant. Call out exactly what to

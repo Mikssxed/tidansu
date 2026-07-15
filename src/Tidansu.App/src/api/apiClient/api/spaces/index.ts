@@ -29,6 +29,7 @@ export interface SpacesRequestBuilder extends BaseRequestBuilder<SpacesRequestBu
      * @returns {Promise<SpaceDtoApiOperationResult>}
      * @throws {ProblemDetails} error when the service returns a 400 status code
      * @throws {ProblemDetails} error when the service returns a 403 status code
+     * @throws {ProblemDetails} error when the service returns a 413 status code
      */
      post(body: SpaceDto, requestConfiguration?: RequestConfiguration<object> | undefined) : Promise<SpaceDtoApiOperationResult | undefined>;
     /**
@@ -72,6 +73,7 @@ export const SpacesRequestBuilderRequestsMetadata: RequestsMetadata = {
         errorMappings: {
             400: createProblemDetailsFromDiscriminatorValue as ParsableFactory<Parsable>,
             403: createProblemDetailsFromDiscriminatorValue as ParsableFactory<Parsable>,
+            413: createProblemDetailsFromDiscriminatorValue as ParsableFactory<Parsable>,
         },
         adapterMethodName: "send",
         responseBodyFactory:  createSpaceDtoApiOperationResultFromDiscriminatorValue,

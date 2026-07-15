@@ -123,7 +123,12 @@ _Touch points:_ `appsettings*.json`, `Program.cs`, `.env`/Vite config,
 
 ### [B-8] Security & scalability audit (UI + backend)
 **Priority**: P3
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-14 — audited; see `docs/active/tasks/B-8-security-scalability-audit/review.md`.
+**0 Critical · 8 Major · 9 Minor.** Core data path verified clean (IDOR/ownership,
+billing/webhook integrity, redirect safety, auth/token, DB indexes). 8 Majors carved off
+as B-12–B-19; 5 Minors fixed inline (S-5 JWT-secret guard scope, S-7 reset SyncOn on
+downgrade, S-8 reject /0 proxy ranges, U-4 guard CreateSpace finish, U-5 revert sync toggle).
+Remaining Minors S-3/S-4/S-6/SC-4/SC-5 left as low-priority hardening in the report.)
 A final pre-launch audit across the whole app: backend security (IDOR/ownership on
 spaces/zones/items, plan-limit bypass, auth/token handling, billing/webhook
 integrity, input validation, redirect safety) and scalability (N+1 queries,
@@ -136,7 +141,7 @@ controllers/handlers, auth & billing surfaces, `TidansuDbContext`.
 
 ### [B-9] Harden the Stripe webhook endpoint (rate-limit + body cap)
 **Priority**: P3
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-14 — built, live-verified & reviewed clean; see `docs/active/tasks/B-9-harden-stripe-webhook/`. Endpoint-wide 60/min rate limit + 512 KB body cap on `/api/billing/webhook`; oversized→413, over-rate→429, both before signature verification.)
 Follow-up from the B-6 security review. The Stripe webhook (`/api/billing/webhook`) is
 necessarily `[AllowAnonymous]`, so signature verification is its only gate. Add
 defence-in-depth so a flood of junk payloads can't tie up the app: a per-endpoint rate
@@ -147,7 +152,12 @@ _Touch points:_ `src/Tidansu.API/Controllers/BillingController.cs`, `Program.cs`
 
 ### [B-10] Handle delayed/async Stripe payment methods
 **Priority**: P3
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-14 — built, live-verified via hand-signed HMAC webhook fixtures &
+reviewed clean; see `docs/active/tasks/B-10-handle-async-stripe-payments/`. Both
+`checkout.session.async_payment_succeeded` (grants Pro via the shared `ClientReferenceId`-only
+handler) and `checkout.session.async_payment_failed` (silent no-op, stays Free) now route through
+the existing idempotency ledger. 0 Critical/Security findings; 1 Major + 1 Minor log/comment nit
+fixed inline. Dormant until delayed payment methods are enabled. **Changes left uncommitted.**)
 Follow-up from B-6. Pro is granted only when `checkout.session.completed` reports
 `PaymentStatus == "paid"` (correct for cards). Delayed-notification methods (e.g. SEPA
 debit, some wallets) can complete checkout with payment still pending, then settle later —
@@ -159,13 +169,223 @@ event dispatch).
 
 ### [B-11] Bump dependencies flagged by NU1903 advisories
 **Priority**: P3
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-14 — built, Kiota-regen-verified & reviewed clean; see
+`docs/active/tasks/B-11-bump-vulnerable-deps/`. Build now emits **0 `NU1903`**: bumped
+`Swashbuckle.AspNetCore 10.1.2 → 10.2.3` (lifts transitive `Microsoft.OpenApi` to patched
+2.7.5; global CLI updated to match), pinned `System.Security.Cryptography.Xml 9.0.15`. AutoMapper
+was **not** bumped — clearing its advisory forces v15, which requires a commercial license, so the
+advisory is **suppressed via `NuGetAuditSuppress`** (scoped to GHSA-rvv3-g6hj-g44x, in all three
+consuming `.csproj`) as an interim pending a licensing decision. Review: 0 Critical/Major, 2
+optional Minors (centralize the suppress; `PrivateAssets` on the pin) shipped as-is. Changes left
+uncommitted.)
 The build surfaces `NU1903` known-vulnerability advisories on transitive/direct packages:
 `AutoMapper 12.0.1`, `System.Security.Cryptography.Xml 9.0.0`, and `Microsoft.OpenApi 2.4.1`.
 None are B-6-specific — they pre-date it — but they should be reviewed and bumped to patched
 versions (minding the Swashbuckle/OpenApi version-match constraint that the Kiota regen
 tooling depends on). Verify build + a Kiota regen still work after the bump.
 _Touch points:_ `*.csproj` package references; re-verify `npm run build:api`.
+
+### [B-12] Close the Free space-cap concurrency race (S-1)
+**Priority**: P2
+**Status**: ✅ done (2026-07-15 — built, concurrency-verified & reviewed; see
+`docs/active/tasks/B-12-close-space-cap-race/`. Cap now enforced atomically via a per-user
+exclusive `sp_getapplock` + authoritative in-lock re-count in a new
+`ISpacesRepository.AddWithinSpaceCapAsync`; Pro (unlimited) bypasses the lock entirely. No EF
+migration, no Kiota regen (403 `{plan:["spaces"]}` contract unchanged). **Proven:** 25
+truly-concurrent creates at 1 space → exactly 1×200 / 24×403 / 0×500, count held at 2; Pro
+10-way → 10/10×200. Both reviewers converged on one Major — `sp_getapplock` reports via a
+stored-proc **return code**, not an exception, and discarding it **failed open** on lock
+timeout; fixed (capture code, `<0` → log + rollback + throw as a 500, not a false `reason:
+spaces`) and proven fail-closed by holding the lock from a second connection (blocked 5.11 s →
+500, **zero** inserts). Minors S-N1 (SHA-256 fixed-width lock key) + S-L1 (timeout logging)
+fixed; N1 (`PlanCaps.For` evaluated twice) accepted as negligible. Changes left uncommitted.)
+From the B-8 audit (🟠 S-1). The Free 2-space cap is enforced with a read-then-insert in
+`CreateSpaceCommandHandler` — count is read, then the space is inserted in a separate
+non-locking round-trip, with no DB-level constraint. A user at 1 space firing several
+concurrent `POST /api/spaces` can have every request read count < 2 and all insert,
+exceeding the paid cap. Enforce the count-check + insert atomically (serializable
+transaction or a DB-level per-user space-count constraint) so parallel POSTs can't both
+pass the gate. This is a genuine plan-limit bypass, though it needs deliberate concurrency.
+_Touch points:_ `src/Tidansu.Application/Spaces/Commands/CreateSpace/CreateSpaceCommandHandler.cs`,
+`src/Tidansu.Infrastructure` (repository / DB constraint).
+
+### [B-13] Validate the space zone/item graph + photo content-type/size (S-2)
+**Priority**: P2
+**Status**: ✅ done (2026-07-15 — built, driven & double-reviewed; see
+`docs/active/tasks/B-13-validate-space-graph-photos/`. **0 Critical, 0 security Major.** The S-2 hole
+is proven shut: a `<script>` payload declaring `data:image/png;base64,` → 400, nothing written.
+`PhotoPolicy` (Domain, pure, 51 unit tests) validates the data URL span-based with no regex and no
+multi-MB allocation — cheap rejects first, arithmetic decoded-size check, then a 12-byte magic-byte
+sniff that must **agree** with the declared type (defeats a spoofed prefix). JPEG/PNG/WebP only; SVG
+excluded as a script vector. Photo check lives in the **handler**, not FluentValidation, so the Free
+plan gate still wins (Free + invalid photo → **403** `photos`, not 400 — verified). Field/tag bounds
+(DB-parity) stay in FluentValidation; `[RequestSizeLimit(24MB)]` + 413 added. No EF migration; Kiota
+regen was needed (413 only, +2/+2). B-12's app-lock untouched (5 concurrent POSTs → 1×200/4×403).
+Review's one Major (M1, `tags:null` → 500) was **disproven by driving** — MVC ModelState 400s it
+before FluentValidation runs; the `NotNull()` was kept as defence-in-depth. Tag constants moved to
+`ItemCaps`. **Residual (documented, inherited by B-16):** header-only sniffing lets a polyglot
+(PNG header + script tail) be stored — inert while photos are only ever `<img>` sources, dangerous
+if B-16 serves them with a stored `Content-Type`. Spawned **B-20** (mixed-language validation
+errors). Changes left uncommitted.)
+From the B-8 audit (🟠 S-2). Create/Update space validators bind only `Space.Id/Name/Type`;
+the `Zones`/`Items` collections and their fields are unvalidated at the app layer, so
+over-long fields 500 (via `DbUpdateException`) instead of returning a clean 400. Worse,
+`Item.Photo` is uncapped `nvarchar(max)` with no content-type check — a Pro user can store
+arbitrarily large or non-image (`javascript:`, `data:text/html`) data URLs verbatim, which
+the SPA later renders as `img` sources. Add FluentValidation rules for the zone/item graph
+(lengths matching the DB `HasMaxLength`, tag bounds) and validate `Photo` as an allow-listed
+image content-type with a hard per-photo byte cap; reject as 400, don't store.
+_Touch points:_ `CreateSpaceCommandValidator.cs`, `UpdateSpaceCommandValidator.cs`, DTOs,
+`TidansuDbContext` (photo column).
+
+### [B-14] Account usage counts via projection, not full space-graph load (SC-1)
+**Priority**: P2
+**Status**: ✅ done (2026-07-15 — built, SQL-log-verified & reviewed clean; see
+`docs/active/tasks/B-14-usage-counts-projection/`. **0 Critical, 0 Major.** Usage now comes from
+one narrow round-trip — `Spaces.Where(s => s.UserId == userId).Select(s => s.Items.Count)` — that
+emits a single `COUNT(*)` correlated subquery: no `Zones`, no `Item.*`, no `Photo` blob, no
+split-query trio. No EF migration, no Kiota regen (account response shape unchanged).
+**Scope widened at the requirements gate:** the backlog named only `GetAccountQueryHandler`, but
+the identical `GetAllByUserAsync` → `UsageDto.From` pattern also fed `ChangePlanCommandHandler` and
+`SetSyncCommandHandler` — all **three** were swapped, or SC-1 would have been only a third fixed.
+`UsageDto.From` was retyped `List<Space>` → `List<int>` deliberately so the compiler proves every
+call site moved. `GetSpacesQueryHandler` correctly left on the full graph (B-16's territory).
+**Proven by driving** (EF SQL log, not just output — the slow path also produced correct numbers):
+zero spaces → `0/0/0` no 500 (the `Count == 0` guard kept verbatim; dropping it would 500 every new
+signup's first account load), 2 empty → `2/0/0`, 3+1 → `2/4/3`, tie 3+3 → `2/6/3`, Pro photo item →
+correct with no `Photo` column; all three surfaces one statement each; Free-at-2-spaces still
+`403 {"plan":["spaces"]}`; post-downgrade over-cap still reports true `3/6/3`. Ownership filter
+verified character-identical to `GetAllByUserAsync`'s. 2 Minors left open by design: the guard has
+no automated test home (`Domain.Tests` can't reach Application — needs a standalone structural
+decision), and `GetAllByUserAsync` is now single-caller so its `Include`/`AsSplitQuery` shape could
+be narrowed — deferred to **B-16**, which reworks that same method. Changes left uncommitted.)
+From the B-8 audit (🟠 SC-1). The account page's `GetAccountQueryHandler` loads the whole
+space graph — every zone and every item, including `Item.Photo` data-URL blobs — only to
+compute three integers (spaces, item count, max items). A Pro user with a few hundred photo
+items pulls multiple MB across the wire and into memory on every account-page load. Replace
+with a projection/aggregate query (`CountAsync`/`GroupBy`) that never materializes zones,
+items, or photos; add a counts-only repository method.
+_Touch points:_ `src/Tidansu.Application/Account/Queries/GetAccount/`, `SpacesRepository.cs`,
+`UsageDto.cs`.
+
+### [B-15] Diff-based space update instead of delete-all/re-insert on every save (SC-2)
+**Priority**: P3
+**Status**: unprocessed
+From the B-8 audit (🟠 SC-2). `SpacesRepository.ReplaceAsync` deletes and re-inserts all zones
+and items on every debounced whole-space PUT, so renaming one item in a 50-item space issues
+~100 DELETE + ~100 INSERT and rewrites every item's photo blob instead of a single-row UPDATE
+— heavy write amplification and index churn under load. Diff the incoming set against the
+existing rows and apply per-entity add/update/remove (match on id), or move to granular
+item/zone endpoints. Design change.
+_Touch points:_ `src/Tidansu.Infrastructure/Repositories/SpacesRepository.cs`,
+`UpdateSpaceCommandHandler.cs`, possibly the frontend save path.
+
+### [B-16] Paginate/slim the spaces list; stop returning photo data-URLs inline (SC-3)
+**Priority**: P3
+**Status**: unprocessed
+From the B-8 audit (🟠 SC-3). `GET /api/spaces` returns every space, zone and item with each
+`Photo` base64 inline and no paging, all eagerly loaded on app boot. A heavy Pro account
+returns a tens-of-MB response that grows unbounded. Two tracks: (a) don't ship photo blobs in
+the list — return a reference/URL and fetch the image separately (ideally move photos to blob
+storage rather than `nvarchar(max)`); (b) introduce paging or per-space lazy-load so the client
+isn't forced to hold the whole account in memory. Overlaps the photo-storage question; keep
+separate from B-10.
+**⚠️ Security precondition inherited from B-13** (see its `security-review.md`): B-13 validates a
+photo by sniffing only the first 12 bytes against JPEG/PNG/WebP magic bytes, so a **polyglot**
+(valid PNG header + HTML/script tail) is stored. That is inert *today* — `<img>` never executes its
+content and browsers don't content-sniff `data:` URLs. Serving photos from an endpoint changes
+that: if the new endpoint sets `Content-Type` from the stored declared type, the tail becomes a
+response body. The global `nosniff` header (`Program.cs`) defuses it **only if the new endpoint
+inherits that middleware** — verify it does, and prefer serving from a separate origin/bucket with
+a fixed content type. Do not treat B-13's validation as sufficient once photos are served.
+**Inherited from B-14 (deferred here by decision, not oversight):** B-14 moved the account-usage
+counts off `ISpacesRepository.GetAllByUserAsync`, so `GetSpacesQueryHandler.cs:15` is now its
+**only** caller. That method's `Include`(zones+items) + `AsSplitQuery` shape therefore exists solely
+to serve the layout view and could be renamed/narrowed to say so — a real deepening opportunity that
+was left for B-16 precisely because B-16 reworks that same method. Weigh it as part of this task
+rather than re-deriving it.
+_Touch points:_ `GetSpacesQueryHandler.cs`, `SpacesRepository.cs`, DTOs, `App.vue`/`useSpacesStore.ts`.
+
+### [B-17] Reflect read-only over-cap spaces after downgrade in the UI (U-1)
+**Priority**: P2
+**Status**: unprocessed
+From the B-8 audit (🟠 U-1). The product rule and the app's own FAQ (`PricingView`) promise that
+after a downgrade, spaces/items beyond the Free limits become read-only — but nothing in the SPA
+enforces it. Guards only block *adding* past a cap, so a Pro user who drops to Free keeps all
+over-cap spaces fully editable (rename, add/edit/remove items, add zones) — the opposite of what
+the UI tells them. Derive a per-space over-cap/read-only flag (spaces beyond `caps.spaces`,
+deterministic sort), disable the mutating affordances, and badge them "Read-only — upgrade to
+edit". (Server-side enforcement of the same is a separate concern.)
+_Touch points:_ `src/Tidansu.App` — `useLimits.ts`, `DashboardView.vue`, `SpaceView.vue`.
+
+### [B-18] Loading + error/retry states for spaces hydrate (U-2)
+**Priority**: P2
+**Status**: unprocessed
+From the B-8 audit (🟠 U-2). The initial spaces load (`App.vue` → `useSpacesStore.hydrate`) is
+fire-and-forget with no loading or error state. A failed fetch (offline, 500, expired token)
+leaves `spaces = []`, so `DashboardView` shows "No spaces yet" to a user who *has* data — and
+can trigger the starter-fridge seed as if it were a brand-new account. Even the happy path
+flashes the empty state until the fetch resolves. Expose TanStack Query's `isLoading`/`isError`,
+render a spinner during load and an error+retry panel on failure, and gate the empty-state/seed
+on a *successful empty* response only.
+_Touch points:_ `App.vue`, `src/Tidansu.App/src/stores/useSpacesStore.ts`, `DashboardView.vue`.
+
+### [B-19] Surface (not swallow) non-plan space-sync failures (U-3)
+**Priority**: P2
+**Status**: unprocessed
+From the B-8 audit (🟠 U-3). Space create/update/delete mutate the store optimistically then
+persist via `.catch(handleSyncError)`, which handles only the plan-limit 403 — every other
+failure (network, 500, 401) is `console.error`-only. The user sees the edit "succeed" locally,
+gets zero feedback that it never persisted, and loses it on reload (created spaces vanish, edits
+revert). On non-plan errors, surface a user-visible toast/banner and either retry or roll back
+the optimistic change so local state matches the server. Reuse the transient-message pattern
+already used by `setPlan`.
+_Touch points:_ `src/Tidansu.App/src/stores/useSpacesStore.ts` (`handleSyncError`).
+
+### [B-21] Fix `npm run build:api` — `swagger tofile` can't find a `Startup`
+**Priority**: P3
+**Status**: unprocessed
+The documented way to regenerate the frontend's API client (`npm run build:api` in
+`src/Tidansu.App`) has never actually worked. Its first step, `build:api-file`
+(`swagger tofile … Tidansu.API.dll v1`), fails with *"A type named 'Startup' could not be found"* —
+so every task needing a regen (B-6, B-9, B-11, B-13) has hand-run a workaround instead: boot the API
+with an empty connection string and `curl` `/swagger/v1/swagger.json` out of the running app, then
+run the remaining three steps by hand. That's slow, easy to get wrong, and means the documented
+command in `CLAUDE.md` is a trap for anyone new.
+**Diagnosed, not guessed:** this is **not** the Swashbuckle/OpenApi version-match problem from B-11
+— B-11 bumped the API to `Swashbuckle.AspNetCore` 10.2.3 and updated the global CLI to match, and
+the error persisted. The real cause is structural: `grep -rn "class Startup" src/` returns **nothing**.
+The API uses minimal hosting (top-level statements in `Program.cs`), and the Swashbuckle CLI builds
+the host by reflection expecting the older `Startup`/`CreateHostBuilder` shape. Version-matching can
+never fix that.
+Make one documented command work end-to-end. Options for the tech-lead to weigh: promote the
+running-app fetch to be the real `build:api-file` step (proven — it's what everyone already does);
+switch to build-time OpenAPI document generation (`Microsoft.Extensions.ApiDescription.Server`, or
+.NET's newer built-in OpenAPI doc generation, both of which support minimal hosting); or add a
+`Startup` shim purely to satisfy the CLI (least attractive — ceremony for a tool's benefit). Success =
+a clean clone runs `npm run build:api` and gets a correct client, with no manual steps and no
+version-pinning tribal knowledge.
+_Touch points:_ `src/Tidansu.App/package.json` (the `build:api*` script chain),
+possibly `src/Tidansu.API/Tidansu.API.csproj` + `Program.cs`, `CLAUDE.md` (the documented command),
+and the `kiota-regen-tooling` note. Verify by regenerating from a clean clone and confirming the
+client diff is empty against the committed one.
+
+### [B-20] Pin a culture so validation errors aren't mixed-language
+**Priority**: P3
+**Status**: unprocessed
+Found while driving B-13's verification. The API pins no culture — there is no `CultureInfo`,
+`RequestLocalization` or `InvariantGlobalization` setting anywhere in `Program.cs`, the csproj or
+`appsettings*.json` — so FluentValidation's built-in messages localize to whatever the **host OS**
+locale is, while every hand-written message in the codebase is English. On a Polish dev box the API
+returns *"Długość pola 'Tags' musi być mniejsza lub równa 24 znaki(ów)"* for a too-long tag but
+*"'Tags' must contain no more than 15 items."* for too many tags — same form, two languages. The
+user-visible result varies by deploy host, which also makes it a reproducibility trap. Pre-existing,
+but B-13 widened it a lot by adding ~15 validation rules. Decide the product position (the UI is
+English-only today: pin invariant/en-US, most likely) and apply it once, centrally. If real i18n is
+ever wanted, that's a much larger piece of work — this item is just about making the app pick one
+language on purpose instead of by accident.
+_Touch points:_ `src/Tidansu.API/Program.cs` (culture config), possibly `Tidansu.API.csproj`
+(`InvariantGlobalization`); verify by driving a validation failure and checking the message language.
 
 ---
 

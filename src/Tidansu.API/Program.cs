@@ -82,6 +82,15 @@ foreach (var network in knownNetworks)
             $"ForwardedHeaders:KnownNetworks contains an invalid CIDR range: '{network}'.");
     }
 
+    // Reject any full-coverage range regardless of spelling — a /0 (or split
+    // full-coverage pairs like 0.0.0.0/1 + 128.0.0.0/1) trusts every client and
+    // re-opens X-Forwarded-For spoofing. Catches ranges the string checks above miss.
+    if (parsedNetwork.PrefixLength == 0)
+    {
+        throw new InvalidOperationException(
+            $"ForwardedHeaders:KnownNetworks must not contain a /0 (all-addresses) range: '{network}'. List explicit CIDR ranges.");
+    }
+
     forwardedHeadersOptions.KnownIPNetworks.Add(parsedNetwork);
 }
 

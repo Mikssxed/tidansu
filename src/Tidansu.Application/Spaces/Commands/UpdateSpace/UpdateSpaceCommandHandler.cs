@@ -30,6 +30,12 @@ public class UpdateSpaceCommandHandler(
         if (PlanPolicy.CheckSpaceMutation(user.Plan, before, after) is { } reason)
             throw new PlanLimitException(reason);
 
+        // Must run after the plan gate above and before any mutation of `existing` below:
+        // a Free user sending a photo (valid or invalid) still gets 403 {plan:["photos"]},
+        // never this guard's 400 (B-13 D-8.2). `existing` is EF-tracked, so throwing before
+        // mutating it avoids leaving dirtied tracked state on the scoped DbContext.
+        SpacePhotoGuard.ThrowIfInvalid(dto);
+
         // Scalar fields (existing is tracked → persisted by ReplaceAsync).
         existing.Name = dto.Name;
         existing.Type = dto.Type;

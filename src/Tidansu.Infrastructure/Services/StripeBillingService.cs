@@ -156,7 +156,21 @@ public class StripeBillingService : IBillingService
         switch (stripeEvent.Type)
         {
             case "checkout.session.completed":
-                await ProcessOnceAsync(stripeEvent, OnCheckoutCompletedAsync, cancellationToken);
+                await ProcessOnceAsync(stripeEvent, OnCheckoutSessionPaidAsync, cancellationToken);
+                break;
+
+            // A delayed-notification payment method (SEPA debit, some wallets) can complete
+            // checkout with payment still pending; Stripe reports settlement later via this
+            // event. Reuses the SAME grant handler as the card path — one Pro-grant code
+            // path, same ClientReferenceId-only identity resolution, same idempotency ledger.
+            case "checkout.session.async_payment_succeeded":
+                await ProcessOnceAsync(stripeEvent, OnCheckoutSessionPaidAsync, cancellationToken);
+                break;
+
+            // The delayed payment ultimately failed to settle — Pro was never granted for
+            // this session, so there is nothing to revoke. Logged no-op (see task.md Notes).
+            case "checkout.session.async_payment_failed":
+                await ProcessOnceAsync(stripeEvent, OnAsyncPaymentFailedAsync, cancellationToken);
                 break;
 
             case "customer.subscription.updated":
@@ -208,34 +222,38 @@ public class StripeBillingService : IBillingService
         await transaction.CommitAsync(cancellationToken);
     }
 
-    // checkout.session.completed → grant Pro. (3) Resolve the account SOLELY from the
-    // ClientReferenceId we set at checkout (the authenticated Tidansu id), never the email.
-    private async Task OnCheckoutCompletedAsync(Event stripeEvent, CancellationToken cancellationToken)
+    // checkout.session.completed AND checkout.session.async_payment_succeeded → grant
+    // Pro. Shared by both event types (B-10): a delayed payment method (SEPA, some
+    // wallets) can complete checkout with payment still pending and only settle later,
+    // reported via the async event — same grant logic applies once settled. (3) Resolve
+    // the account SOLELY from the ClientReferenceId we set at checkout (the
+    // authenticated Tidansu id), never the email.
+    private async Task OnCheckoutSessionPaidAsync(Event stripeEvent, CancellationToken cancellationToken)
     {
         if (stripeEvent.Data.Object is not Session session || string.IsNullOrEmpty(session.ClientReferenceId))
         {
-            _logger.LogWarning("checkout.session.completed with no client reference id; ignoring");
+            _logger.LogWarning("{EventType} with no client reference id; ignoring", stripeEvent.Type);
             return;
         }
 
         // Only grant Pro once the payment actually settled. Cards return "paid" here (the
         // normal path); "no_payment_required" covers 100%-off coupons / trials. A delayed
-        // (async) payment method can emit this event with status still "unpaid" before funds
-        // clear — never promote in that window. Handling the later
-        // checkout.session.async_payment_succeeded for those methods is a documented
-        // follow-up (see task.md Notes), not in scope here.
+        // (async) payment method can emit checkout.session.completed with status still
+        // "unpaid" before funds clear — never promote in that window; this guard is
+        // harmless on checkout.session.async_payment_succeeded, which always arrives
+        // already "paid".
         if (session.PaymentStatus is not ("paid" or "no_payment_required"))
         {
             _logger.LogInformation(
-                "checkout.session.completed for user {UserReference} not yet paid (status {PaymentStatus}); not granting Pro",
-                session.ClientReferenceId, session.PaymentStatus);
+                "{EventType} for user {UserReference} not yet paid (status {PaymentStatus}); not granting Pro",
+                stripeEvent.Type, session.ClientReferenceId, session.PaymentStatus);
             return;
         }
 
         var user = await _userService.FindByIdAsync(session.ClientReferenceId, cancellationToken);
         if (user is null)
         {
-            _logger.LogWarning("checkout.session.completed for unknown user reference; ignoring");
+            _logger.LogWarning("{EventType} for unknown user reference; ignoring", stripeEvent.Type);
             return;
         }
 
@@ -247,6 +265,20 @@ public class StripeBillingService : IBillingService
         await _userService.UpdateAsync(user, cancellationToken);
         _logger.LogInformation("Stripe webhook upgraded user {UserId} to Pro (subscription {SubscriptionId})",
             user.Id, session.SubscriptionId);
+    }
+
+    // checkout.session.async_payment_failed → the delayed payment never settled. Pro was
+    // never granted for this session (only async_payment_succeeded grants it), so there is
+    // nothing to revoke — a logged no-op, silent to the user (consistent with how
+    // invoice.payment_failed is already handled). Must never throw / return non-2xx, or
+    // Stripe would retry an event that can never succeed.
+    private Task OnAsyncPaymentFailedAsync(Event stripeEvent, CancellationToken cancellationToken)
+    {
+        var reference = stripeEvent.Data.Object is Session session ? session.ClientReferenceId : null;
+        _logger.LogInformation(
+            "{EventType} for user reference {UserReference} (event {EventId}); account stays on Free, no mutation",
+            stripeEvent.Type, reference, stripeEvent.Id);
+        return Task.CompletedTask;
     }
 
     // customer.subscription.updated → track cancel-at-period-end + period end so the app can
@@ -294,6 +326,9 @@ public class StripeBillingService : IBillingService
         user.Plan = Plan.Free;
         user.CancelAtPeriodEnd = false;
         user.CurrentPeriodEnd = null;
+        // Sync is a Pro-only capability; drop it on downgrade so a lapsed user can't
+        // retain it (SetSync only re-gates when turning sync on).
+        user.SyncOn = false;
         await _userService.UpdateAsync(user, cancellationToken);
         _logger.LogInformation("Stripe webhook downgraded user {UserId} to Free (subscription ended)", user.Id);
     }
@@ -306,8 +341,9 @@ public class StripeBillingService : IBillingService
         return item is null ? null : new DateTimeOffset(item.CurrentPeriodEnd, TimeSpan.Zero);
     }
 
-    // checkout.session.completed carries no period end — fetch the subscription to record it.
-    // Best-effort: a display date must never fail the (plan-granting) webhook.
+    // The paid checkout session (completed or async_payment_succeeded) carries no period
+    // end — fetch the subscription to record it. Best-effort: a display date must never
+    // fail the (plan-granting) webhook.
     private async Task<DateTimeOffset?> TryGetPeriodEndAsync(string? subscriptionId, CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(subscriptionId))

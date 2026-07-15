@@ -138,6 +138,28 @@ public class ErrorHandlingMiddleware(ILogger<ErrorHandlingMiddleware> logger) : 
 
             await context.Response.WriteAsJsonAsync(errorResponse);
         }
+        catch (Microsoft.AspNetCore.Http.BadHttpRequestException ex)
+        {
+            // Kestrel throws this when a request body exceeds the per-endpoint
+            // RequestSizeLimit (StatusCode 413) or is otherwise malformed. Surface its
+            // real 4xx code instead of masking it as a 500 in the generic catch below.
+            // Never log the body or ex.Message — it could echo an attacker payload.
+            logger.LogWarning("Bad request rejected: {StatusCode}", ex.StatusCode);
+
+            context.Response.StatusCode = ex.StatusCode;
+            context.Response.ContentType = "application/json";
+
+            var errorResponse = new ApiOperationResult
+            {
+                IsSuccess = false,
+                Errors = new Dictionary<string, string[]>
+                {
+                    { ApiOperationResult.GeneralErrorKey, new[] { "Request rejected." } }
+                }
+            };
+
+            await context.Response.WriteAsJsonAsync(errorResponse);
+        }
         catch (BillingUnavailableException ex)
         {
             // Billing is deliberately off or misconfigured. Fail clearly (never a silent

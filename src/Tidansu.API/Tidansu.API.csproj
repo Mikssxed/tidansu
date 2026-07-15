@@ -15,12 +15,20 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.2" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="10.2.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Tidansu.Application\Tidansu.Application.csproj" />
     <ProjectReference Include="..\Tidansu.Infrastructure\Tidansu.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- B-11: NuGetAudit re-flags AutoMapper's NU1903 (GHSA-rvv3-g6hj-g44x) here too, because
+       this project's restore graph transitively includes it via the Tidansu.Application
+       ProjectReference. Same interim suppression as Tidansu.Application.csproj — see there
+       for the rationale. -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-rvv3-g6hj-g44x" />
   </ItemGroup>
 
 </Project>

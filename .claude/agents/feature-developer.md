@@ -1,6 +1,6 @@
 ---
 name: feature-developer
-description: "Implements ONE approved technical task at a time on the Tidansu .NET 10 + Vue 3 stack, verifying by build + type-check + driving the real app (Tidansu has no automated test suite). Invoke per task after a human has approved a task folder's tech-tasks.md (docs/active/tasks/<id>-<slug>/tech-tasks.md).\n\n<example>\nuser: \"Implement the next unchecked task in the B-4 task folder.\"\nassistant: uses feature-developer to read that task folder's task.md + tech-tasks.md, read every file the task touches, implement it minimally to convention, verify with dotnet build + npm run build + a manual drive of the flow, then check the box.\n</example>"
+description: "Implements ONE approved technical task at a time on the Tidansu .NET 10 + Vue 3 stack, verifying by build + type-check + driving the real app (Tidansu has no integration/E2E suite; tests/Tidansu.Domain.Tests covers pure Domain logic only — run it when you touch Domain). Invoke per task after a human has approved a task folder's tech-tasks.md (docs/active/tasks/<id>-<slug>/tech-tasks.md).\n\n<example>\nuser: \"Implement the next unchecked task in the B-4 task folder.\"\nassistant: uses feature-developer to read that task folder's task.md + tech-tasks.md, read every file the task touches, implement it minimally to convention, verify with dotnet build + npm run build + a manual drive of the flow, then check the box.\n</example>"
 tools: Bash, Edit, Write, Glob, Grep, Read, Skill, ToolSearch
 model: sonnet
 color: cyan

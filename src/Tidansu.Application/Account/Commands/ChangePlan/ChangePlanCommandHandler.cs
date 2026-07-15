@@ -32,10 +32,10 @@ public class ChangePlanCommandHandler(
         logger.LogInformation("Plan change requested for user {UserId}: {From} → {To}", userId, user.Plan, target);
         var result = await billing.ChangePlanAsync(user, target, cancellationToken);
 
-        var userSpaces = await spaces.GetAllByUserAsync(userId, cancellationToken);
+        var itemCountsPerSpace = await spaces.GetItemCountsPerSpaceAsync(userId, cancellationToken);
         return new ChangePlanResult
         {
-            Account = AccountDto.From(user, UsageDto.From(userSpaces)),
+            Account = AccountDto.From(user, UsageDto.From(itemCountsPerSpace)),
             CheckoutUrl = result.CheckoutUrl,
             CancellationScheduled = result.CancellationScheduled,
             ProAccessUntil = result.ProAccessUntil,
