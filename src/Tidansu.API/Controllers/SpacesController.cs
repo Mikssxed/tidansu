@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Tidansu.Application.Spaces.Commands.CreateSpace;
 using Tidansu.Application.Spaces.Commands.DeleteSpace;
-using Tidansu.Application.Spaces.Commands.UpdateSpace;
+using Tidansu.Application.Spaces.Commands.UpdateSpaceFields;
 using Tidansu.Application.Spaces.Dtos;
 using Tidansu.Application.Spaces.Queries.GetSpace;
 using Tidansu.Application.Spaces.Queries.GetSpaces;
@@ -53,17 +53,21 @@ public class SpacesController(IMediator mediator) : ControllerBase
         return ApiOperationResult.Ok(result);
     }
 
-    /// <summary>Replace a space's contents (enforces caps with the downgrade rule).</summary>
-    [HttpPut("{id}")]
-    [RequestSizeLimit(24 * 1024 * 1024)] // see CreateSpace — same rationale (B-13 D-9)
-    [ProducesResponseType<ApiOperationResult<SpaceDto>>(StatusCodes.Status200OK)]
+    /// <summary>Update a space's scalar fields only (no zones/items) — see D-6/FR-7.</summary>
+    // 64 KB: this body is six scalar fields and carries no photo, so the ceiling is
+    // generous. It is set explicitly rather than left off (security review S-L1) —
+    // omitting it does NOT mean "small", it means Kestrel's ~28.6 MB default, which is a
+    // *larger* ceiling than the 24 MB whole-space PUT this endpoint replaced. An absent
+    // limit on a body this small is a free DoS surface.
+    [HttpPut("{id}/fields")]
+    [RequestSizeLimit(64 * 1024)]
+    [ProducesResponseType<ApiOperationResult<SpaceFieldsDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
-    public async Task<Ok<ApiOperationResult<SpaceDto>>> UpdateSpace([FromRoute] string id, [FromBody] SpaceDto space)
+    public async Task<Ok<ApiOperationResult<SpaceFieldsDto>>> UpdateSpaceFields([FromRoute] string id, [FromBody] SpaceFieldsDto fields)
     {
-        var result = await mediator.Send(new UpdateSpaceCommand { Id = id, Space = space });
+        var result = await mediator.Send(new UpdateSpaceFieldsCommand { Id = id, Fields = fields });
         return ApiOperationResult.Ok(result);
     }
 

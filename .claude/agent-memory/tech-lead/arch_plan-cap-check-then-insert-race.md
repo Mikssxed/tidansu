@@ -39,6 +39,18 @@ log signal) on race-lost rejections to size how often it fires.
   so a manual transaction is safe, but if retries are ever enabled the manual tx
   must move inside `CreateExecutionStrategy().ExecuteAsync(...)`.
 
+**Generalizing the pattern beyond the space cap (B-15 planned it for zones/items):**
+the contended resource dictates the lock **key**, not "per-user" reflexively. Space
+cap → per-user. Zones/items-per-space caps → **per-space**
+(`tidansu:space-content:{hash(spaceId)}`). Use **one** resource per space covering
+*both* zones and items rather than two: B-12's no-deadlock argument is literally
+"a single resource per transaction", and two resources preserve that only while no
+transaction ever takes both — an invariant a later edit can silently break. One
+resource makes it structural. Contention cost is negligible (one user's own space;
+each critical section is `COUNT(*)` + one insert).
+
 Related: [[arch_errorhandling-middleware-masks-4xx]] (the `PlanLimitException`
-403 arm this reuses lives in `ErrorHandlingMiddleware`).
+403 arm this reuses lives in `ErrorHandlingMiddleware`),
+[[arch_plan-gate-decomposition-algebra]] (what the in-lock re-count compares against
+once the gate is per-mutation).
 </content>

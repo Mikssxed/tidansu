@@ -103,4 +103,22 @@ public class PhotoPolicyTests
         Assert.Equal(5 * 1024 * 1024, PhotoPolicy.MaxPhotoBytes);
         Assert.Equal(6_990_508 + 32, PhotoPolicy.MaxDataUrlChars);
     }
+
+    // ---- PhotoChangeBetween (B-15 / D-2) ------------------------------------------
+    // Two traps pinned here: (null, "") must be Added, not None — "" is a photo per
+    // today's `i.Photo is not null` count, not "no photo" (IsNullOrEmpty would be
+    // wrong); and an identical resent photo must be None, or a downgraded Free user
+    // can never again save a photo-bearing item unchanged.
+    [Theory]
+    [InlineData(null, null, PhotoChange.None)]
+    [InlineData(null, PngDataUrl, PhotoChange.Added)]
+    [InlineData(null, "", PhotoChange.Added)]              // the empty-string-is-a-photo trap
+    [InlineData("a", "a", PhotoChange.None)]                // identical resend — must stay editable
+    [InlineData("a", "b", PhotoChange.Replaced)]
+    [InlineData("a", null, PhotoChange.Removed)]
+    [InlineData("a", "", PhotoChange.Replaced)]
+    public void PhotoChangeBetween_returns_expected(string? existing, string? incoming, PhotoChange expected)
+    {
+        Assert.Equal(expected, PhotoPolicy.PhotoChangeBetween(existing, incoming));
+    }
 }

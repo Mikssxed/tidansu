@@ -4,10 +4,12 @@ using Tidansu.Domain.Exceptions;
 namespace Tidansu.Application.Spaces.Dtos;
 
 // Handler-side (not FluentValidation) guard over Space.Items[i].Photo — see B-13 tech-tasks
-// D-8. The plan-cap check (PlanPolicy.CheckNewSpace / CheckSpaceMutation) must run before
-// this is called, so a Free user sending any photo — valid or invalid — still gets
-// 403 {plan:["photos"]} rather than this guard's 400. Pure, no I/O: safe to call outside
-// any lock, including B-12's sp_getapplock critical section.
+// D-8. The plan-cap check (PlanPolicy.CheckNewSpace, or the granular
+// CheckAddItem/CheckItemPhotoChange — see B-15 D-1/D-2; CheckSpaceMutation itself was
+// retired in B-15 T-8) must run before this is called, so a Free user sending any
+// photo — valid or invalid — still gets 403 {plan:["photos"]} rather than this guard's
+// 400. Pure, no I/O: safe to call outside any lock, including B-12's sp_getapplock
+// critical section.
 internal static class SpacePhotoGuard
 {
     // Fixed, static messages only — never interpolate item.Photo into an error message or
@@ -29,14 +31,34 @@ internal static class SpacePhotoGuard
 
         for (var i = 0; i < space.Items.Count; i++)
         {
-            var rejection = PhotoPolicy.Check(space.Items[i].Photo);
-            if (rejection == PhotoRejection.None) continue;
+            var message = MessageForInvalid(space.Items[i].Photo);
+            if (message is null) continue;
 
             errors ??= [];
-            errors[$"Space.Items[{i}].Photo"] = [MessageFor(rejection)];
+            errors[$"Space.Items[{i}].Photo"] = [message];
         }
 
         if (errors is not null) throw new ValidationException(errors);
+    }
+
+    // Granular path (B-15 T-9): checks a single item's photo. errorKey is adapted by
+    // the caller to identify the one item in the request (FR-12) — e.g. "Item.Photo" —
+    // rather than an index into Space.Items.
+    public static void ThrowIfInvalid(string? photo, string errorKey)
+    {
+        var message = MessageForInvalid(photo);
+        if (message is null) return;
+
+        throw new ValidationException(new Dictionary<string, string[]> { [errorKey] = [message] });
+    }
+
+    // The per-photo core both overloads share (T-27): one implementation of
+    // rejection-to-message mapping, so B-13's ordering guarantee (gate before guard)
+    // can't drift between the whole-space and single-item paths.
+    private static string? MessageForInvalid(string? photo)
+    {
+        var rejection = PhotoPolicy.Check(photo);
+        return rejection == PhotoRejection.None ? null : MessageFor(rejection);
     }
 
     private static string MessageFor(PhotoRejection rejection) => rejection switch

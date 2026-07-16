@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import VueDevTools from 'vite-plugin-vue-devtools';
 
 // https://vite.dev/config/
@@ -11,6 +11,14 @@ export default defineConfig({
         alias: {
             '@': fileURLToPath(new URL('./src', import.meta.url)),
         },
+    },
+    // Narrow scope: vitest covers the pure save-path logic only — pendingChanges.ts's
+    // coalescing rules (T-24) and useSpacesStore's flush orchestration (T-34.7/11/12,
+    // which mock the API boundary rather than mount anything). No jsdom, no component
+    // tests. Those two files are where a silent data-loss bug hides and where a manual
+    // drive cannot reach; everything else is still verified by driving the app.
+    test: {
+        include: ['src/**/*.test.ts'],
     },
     build: {
         outDir: '../Tidansu.API/wwwroot',

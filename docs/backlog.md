@@ -342,6 +342,41 @@ the optimistic change so local state matches the server. Reuse the transient-mes
 already used by `setPlan`.
 _Touch points:_ `src/Tidansu.App/src/stores/useSpacesStore.ts` (`handleSyncError`).
 
+### [B-22] Zone/Item primary keys are globally unique + client-supplied → cross-tenant DoS
+**Priority**: P1
+**Status**: unprocessed
+From the B-15 security review (🟠 S-H1). **Pre-existing — not introduced by B-15**, but B-15's
+review is what surfaced it. Three facts compose into a cross-tenant denial of service:
+1. `PK_Zone` / `PK_Item` are on `x => x.Id` **alone** (`Migrations/20260621142555_SpacesZonesItems.cs:57,90`)
+   — `SpaceId` is only an FK. **One zone id is therefore unique across every tenant.**
+2. `ZoneDto.ToEntity`/`ItemDto.ToEntity` take `Id` from the client verbatim; the validators only
+   check `NotEmpty().MaximumLength(64)`.
+3. The client generates ids with a clock, not a CSPRNG (`src/Tidansu.App/src/data/spaces.ts:39-41`):
+   `` `${p}_${(++_id).toString(36)}${Date.now().toString(36).slice(-3)}` ``. `_id` resets to 0 on
+   every page load, so a session's **first** zone is always `zone_1<suffix>`, and the suffix is the
+   low 3 base36 digits of the ms epoch — only **46,656** values, cycling every ~47s.
+
+A Pro account (zones/items uncapped) can insert the entire `zone_1***` id space into its own space.
+Every other user's first zone-add then hits a PK violation → `DbUpdateException` → **500**, and
+reloading resets `_id` and re-collides. It is also a global existence oracle (200 vs 500).
+
+**Attribution, checked at the B-15 review gate — do not "fix" this by reverting B-15.** The review
+argued B-15 made the attack cheaper; the orchestrator verified the opposite. `SpaceDtoValidator`
+puts **no limit on the number** of zones/items, Pro's zone cap is `null` so `CheckNewSpace` skips
+the check entirely, and `POST /api/spaces` allows 24 MB — at ~200 bytes per zone DTO that is
+**~120,000 zones in a single request**, more than covering the 46,656-value space. B-15 never
+touched `POST /api/spaces`. So the attack was already possible in **one** request; post-B-15 it
+*also* works via 46,656 individually rate-limitable requests, i.e. strictly **harder**.
+
+Real fix is a composite key — `HasKey(z => new { z.SpaceId, z.Id })` — which **requires an EF
+migration plus a data migration for existing rows**, and a decision about whether client-supplied
+ids should survive at all (server-assigned ids or a CSPRNG `uid()` would each close it differently).
+That is why this is its own slice and was not folded into B-15, whose D-5 correctly concluded *that
+task* needed no migration. Consider also capping zone/item counts in `SpaceDtoValidator` as cheap
+defence-in-depth regardless of the key decision.
+_Touch points:_ `src/Tidansu.Infrastructure/Persistence/TidansuDbContext.cs`, a new migration,
+`src/Tidansu.App/src/data/spaces.ts` (`uid`), `SpaceDtoValidator.cs`, `ZoneDto`/`ItemDto.ToEntity`.
+
 ### [B-21] Fix `npm run build:api` — `swagger tofile` can't find a `Startup`
 **Priority**: P3
 **Status**: unprocessed

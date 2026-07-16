@@ -1,7 +1,8 @@
-import type { ItemDto, SpaceDto, ZoneDto } from '@/api/apiClient/models';
+import type { ItemDto, SpaceDto, SpaceFieldsDto, ZoneDto } from '@/api/apiClient/models';
 import type { IconName } from '@/components/icons';
 import type {
     CanvasMode,
+    Item,
     ItemDepth,
     Space,
     SpaceTypeId,
@@ -28,24 +29,11 @@ export function toSpace(dto: SpaceDto): Space {
         layoutColumns: dto.layoutColumns,
         columnLabels: dto.columnLabels ?? null,
         zones: (dto.zones ?? []).map(toZone),
-        items: (dto.items ?? []).map((i) => ({
-            id: i.id,
-            name: i.name,
-            zoneId: i.zoneId,
-            quantity: i.quantity,
-            tags: i.tags ?? [],
-            dateAdded: i.dateAdded,
-            expiry: i.expiry ?? null,
-            photo: i.photo ?? null,
-            slotIndex: i.slotIndex ?? null,
-            depth: i.depth as ItemDepth,
-            level: i.level,
-            icon: (i.icon as IconName) ?? null,
-        })),
+        items: (dto.items ?? []).map(toItem),
     };
 }
 
-function toZone(z: ZoneDto): Zone {
+export function toZone(z: ZoneDto): Zone {
     return {
         id: z.id,
         position: z.position,
@@ -64,6 +52,23 @@ function toZone(z: ZoneDto): Zone {
     };
 }
 
+export function toItem(i: ItemDto): Item {
+    return {
+        id: i.id,
+        name: i.name,
+        zoneId: i.zoneId,
+        quantity: i.quantity,
+        tags: i.tags ?? [],
+        dateAdded: i.dateAdded,
+        expiry: i.expiry ?? null,
+        photo: i.photo ?? null,
+        slotIndex: i.slotIndex ?? null,
+        depth: i.depth as ItemDepth,
+        level: i.level,
+        icon: (i.icon as IconName) ?? null,
+    };
+}
+
 /** Our `Space` is structurally a valid request body; cast over the rect nullability gap. */
 export function toDtoBody(space: Space): SpaceDto {
     return {
@@ -74,7 +79,30 @@ export function toDtoBody(space: Space): SpaceDto {
         canvasMode: space.canvasMode,
         layoutColumns: space.layoutColumns,
         columnLabels: space.columnLabels,
-        zones: space.zones.map((z) => ({ ...z, rect: z.rect })) as unknown as ZoneDto[],
-        items: space.items.map((i) => ({ ...i })) as unknown as ItemDto[],
+        zones: space.zones.map(toZoneDtoBody),
+        items: space.items.map(toItemDtoBody),
+    };
+}
+
+/** Request body for `PUT /api/spaces/{id}/zones/{zoneId}` and the `POST` add. */
+export function toZoneDtoBody(zone: Zone): ZoneDto {
+    // Cast over the rect nullability gap — see the module doc comment.
+    return { ...zone, rect: zone.rect } as unknown as ZoneDto;
+}
+
+/** Request body for `PUT /api/spaces/{id}/items/{itemId}` and the `POST` add. */
+export function toItemDtoBody(item: Item): ItemDto {
+    return { ...item } as unknown as ItemDto;
+}
+
+/** Request body for `PUT /api/spaces/{id}/fields` — the space's scalar fields only. */
+export function toSpaceFieldsBody(space: Space): SpaceFieldsDto {
+    return {
+        name: space.name,
+        type: space.type,
+        viewMode: space.viewMode,
+        canvasMode: space.canvasMode,
+        layoutColumns: space.layoutColumns,
+        columnLabels: space.columnLabels,
     };
 }
