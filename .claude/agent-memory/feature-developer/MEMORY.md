@@ -11,3 +11,8 @@
 - [Verify concurrency race needs multiprocess](verify-concurrency-race-needs-multiprocess.md) — bash `&`/Python threading aren't tight enough to hit a DB-lock race window; use multiprocessing.Barrier + pre-connected sockets
 - [Minimal genuine image fixtures for sniffing](minimal-genuine-image-fixtures-for-sniffing.md) — hand-build real JPEG/PNG/WebP byte headers (no imaging lib) for magic-byte unit tests
 - [Dev magic-link token for curl](dev-magic-link-token-for-curl.md) — Development env skips SMTP entirely; devLink comes back in the API response, consume route is `/api/auth/consume`
+- [Domain interface extension needs infra stub](domain-interface-extension-needs-infra-stub.md) — a Domain-only task batch that adds repository interface members breaks the build unless the Infrastructure implementer gets placeholder bodies
+- [EF ExecuteDeleteAsync needs its own transaction](ef-executedeleteasync-needs-own-transaction.md) — it bypasses SaveChangesAsync; combine with a tracked Remove() only inside an explicit BeginTransactionAsync
+- [Tidansu.App Vitest wiring](project_tidansu-app-vitest-wiring.md) — first test runner in the repo (B-15/T-24); vue-tsc type-checks `*.test.ts` too, scope stays narrow
+- [EF navigation defaults stay empty, not null, without .Include](ef-navigation-default-empty-not-null.md) — a `FromEntity` mapper on a partially-loaded entity silently emits misleading empty collections instead of failing
+- [Batched task lists can leave the API red between runs](batched-task-lists-can-leave-api-red-between-runs.md) — a deletion task scheduled ahead of the controller task that stops calling it is an expected, reportable gap, not a bug to silently patch

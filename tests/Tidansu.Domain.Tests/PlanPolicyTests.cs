@@ -35,43 +35,6 @@ public class PlanPolicyTests
         Assert.Equal(expected, result);
     }
 
-    // ---- Mutation: editing an existing space (downgrade rule) --------------------
-
-    [Theory]
-    // Free — within caps
-    [InlineData(Plan.Free, 0, 0, 0, 0, 0, 0, null)]                  // empty → empty
-    [InlineData(Plan.Free, 0, 0, 0, 6, 50, 0, null)]                 // grow up to the caps exactly
-    // Free — over cap but not growing (downgrade: stays editable)
-    [InlineData(Plan.Free, 8, 0, 0, 8, 0, 0, null)]                  // 8 zones stays 8
-    [InlineData(Plan.Free, 8, 0, 0, 7, 0, 0, null)]                  // over-cap zones shrinking
-    [InlineData(Plan.Free, 0, 60, 0, 0, 60, 0, null)]               // over-cap items unchanged
-    // Free — over cap AND growing → blocked
-    [InlineData(Plan.Free, 8, 0, 0, 9, 0, 0, PlanLimitReasons.Zones)]
-    [InlineData(Plan.Free, 6, 0, 0, 7, 0, 0, PlanLimitReasons.Zones)]
-    [InlineData(Plan.Free, 0, 60, 0, 0, 61, 0, PlanLimitReasons.Items)]
-    // Free — zone growth into cap boundary is allowed at exactly cap
-    [InlineData(Plan.Free, 0, 0, 0, 6, 0, 0, null)]                  // 6 is not > 6
-    // Free — photos gate on delta (any increase blocked)
-    [InlineData(Plan.Free, 0, 0, 0, 0, 0, 1, PlanLimitReasons.Photos)]   // 0 → 1
-    [InlineData(Plan.Free, 0, 0, 1, 0, 0, 2, PlanLimitReasons.Photos)]   // 1 → 2
-    [InlineData(Plan.Free, 0, 0, 2, 0, 0, 1, null)]                      // 2 → 1 (removing, allowed)
-    // Free — precedence: zones before items
-    [InlineData(Plan.Free, 0, 0, 0, 7, 61, 0, PlanLimitReasons.Zones)]
-    // Pro — unlimited, nothing fires even when growing hugely
-    [InlineData(Plan.Pro, 0, 0, 0, 999, 999, 999, null)]
-    public void CheckSpaceMutation_returns_expected(
-        Plan plan,
-        int beforeZones, int beforeItems, int beforePhotos,
-        int afterZones, int afterItems, int afterPhotos,
-        string? expected)
-    {
-        var result = PlanPolicy.CheckSpaceMutation(
-            plan,
-            new SpaceUsage(beforeZones, beforeItems, beforePhotos),
-            new SpaceUsage(afterZones, afterItems, afterPhotos));
-        Assert.Equal(expected, result);
-    }
-
     // ---- Caps source of truth ----------------------------------------------------
 
     [Fact]
@@ -95,4 +58,50 @@ public class PlanPolicyTests
         Assert.True(caps.Photos);
         Assert.True(caps.Sync);
     }
+
+    // ---- Per-mutation gate (B-15 / D-1) -------------------------------------------
+    // CheckAddZone/CheckAddItem/CheckItemPhotoChange are the now-deleted
+    // CheckSpaceMutation's `after > cap && after > before` rule decomposed
+    // algebraically per mutation shape (see the derivation comment on PlanPolicy).
+    // The equivalence theory that pinned this decomposition against CheckSpaceMutation
+    // (n = 0..60, both plans) ran green and was removed in T-8 once CheckSpaceMutation
+    // itself was deleted — keeping the old rule alive only to be tested against would
+    // have been dead production code.
+
+    [Theory]
+    [InlineData(Plan.Free, 0, null)]
+    [InlineData(Plan.Free, 5, null)]                       // under cap
+    [InlineData(Plan.Free, 6, PlanLimitReasons.Zones)]      // at cap
+    [InlineData(Plan.Free, 8, PlanLimitReasons.Zones)]      // downgraded, over cap, growing
+    [InlineData(Plan.Pro, 999, null)]                       // unlimited
+    public void CheckAddZone_returns_expected(Plan plan, int currentZones, string? expected)
+    {
+        Assert.Equal(expected, PlanPolicy.CheckAddZone(plan, currentZones));
+    }
+
+    [Theory]
+    [InlineData(Plan.Free, 49, PhotoChange.None, null)]
+    [InlineData(Plan.Free, 50, PhotoChange.None, PlanLimitReasons.Items)]        // at cap, no photo
+    [InlineData(Plan.Free, 0, PhotoChange.Added, PlanLimitReasons.Photos)]       // well under items cap — photos still gates
+    [InlineData(Plan.Free, 50, PhotoChange.Added, PlanLimitReasons.Photos)]      // both would fire — photos wins (inverted precedence)
+    [InlineData(Plan.Pro, 999, PhotoChange.Added, null)]                        // unlimited, photos allowed
+    public void CheckAddItem_returns_expected(Plan plan, int currentItems, PhotoChange photo, string? expected)
+    {
+        Assert.Equal(expected, PlanPolicy.CheckAddItem(plan, currentItems, photo));
+    }
+
+    [Theory]
+    [InlineData(Plan.Free, PhotoChange.None, null)]
+    [InlineData(Plan.Free, PhotoChange.Removed, null)]
+    [InlineData(Plan.Free, PhotoChange.Added, PlanLimitReasons.Photos)]
+    [InlineData(Plan.Free, PhotoChange.Replaced, PlanLimitReasons.Photos)]
+    [InlineData(Plan.Pro, PhotoChange.None, null)]
+    [InlineData(Plan.Pro, PhotoChange.Added, null)]
+    [InlineData(Plan.Pro, PhotoChange.Replaced, null)]
+    [InlineData(Plan.Pro, PhotoChange.Removed, null)]
+    public void CheckItemPhotoChange_returns_expected(Plan plan, PhotoChange change, string? expected)
+    {
+        Assert.Equal(expected, PlanPolicy.CheckItemPhotoChange(plan, change));
+    }
+
 }

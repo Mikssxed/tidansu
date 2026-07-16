@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 using Tidansu.Domain.Entities;
 using Tidansu.Domain.Repositories;
@@ -62,37 +63,8 @@ public class SpacesRepository(TidansuDbContext dbContext, ILogger<SpacesReposito
         // and Identity ids can grow up to 450 chars, so hash rather than concatenate the raw
         // id (defense-in-depth — GUID ids fit comfortably today, but a future longer id
         // scheme must not truncate two different users onto the same lock resource).
-        var resource = $"tidansu:space-create:{HashUserIdForLock(space.UserId)}";
-
-        // sp_getapplock reports outcome via its stored-procedure RETURN code, not by
-        // throwing: 0/1 = granted, negative = not granted (-1 timeout, -2 cancelled,
-        // -3 deadlock victim, -999 other error). It must be captured explicitly — a
-        // discarded return value silently falls through to the count+insert WITHOUT the
-        // lock held, reopening the exact race this method exists to close.
-        // Materialize via ToListAsync (not SingleAsync/FirstAsync): those compose an extra
-        // TOP(N) wrapper around the SQL, which EF rejects as "non-composable" for a
-        // multi-statement DECLARE/EXEC/SELECT batch. ToListAsync executes the batch as-is.
-        var lockResults = await dbContext.Database
-            .SqlQuery<int>(
-                $@"DECLARE @res int;
-EXEC @res = sp_getapplock @Resource={resource}, @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout={5000};
-SELECT @res AS Value;")
-            .ToListAsync(cancellationToken);
-        var lockResult = lockResults.Single();
-
-        if (lockResult < 0)
-        {
-            // Fail closed: a non-granted lock is a transient infrastructure condition, not
-            // an at-cap decision, so it must never be reported to the caller as a plan-limit
-            // rejection (that would wrongly tell a paying-eligible user they're capped).
-            // Roll back and surface a genuine error (500 via ErrorHandlingMiddleware).
-            logger.LogError(
-                "Space-create lock not acquired for user {UserId}: sp_getapplock returned {LockResult}",
-                space.UserId, lockResult);
-            await transaction.RollbackAsync(cancellationToken);
-            throw new InvalidOperationException(
-                $"Could not acquire space-create lock for user {space.UserId} (sp_getapplock={lockResult}).");
-        }
+        var resource = $"tidansu:space-create:{HashForLock(space.UserId)}";
+        await AcquireLockOrThrowAsync(transaction, resource, $"space-create for user {space.UserId}", cancellationToken);
 
         var currentCount = await dbContext.Spaces.CountAsync(s => s.UserId == space.UserId, cancellationToken);
         if (currentCount >= spaceCap)
@@ -108,27 +80,269 @@ SELECT @res AS Value;")
     }
 
     // SHA-256 hex digest: fixed 64-char width regardless of input length, so the
-    // "tidansu:space-create:" + hash resource key can never approach sp_getapplock's
-    // 255-char @Resource bound, and distinct user ids cannot collide onto the same lock.
-    private static string HashUserIdForLock(string userId)
-        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(userId)));
+    // "tidansu:space-create:"/"tidansu:space-content:" + hash resource key can never
+    // approach sp_getapplock's 255-char @Resource bound, and distinct ids (user ids
+    // here, space ids too as of B-15's per-space content lock below) cannot collide
+    // onto the same lock resource. Renamed from HashUserIdForLock (B-15 T-29): it now
+    // hashes space ids as well as user ids.
+    private static string HashForLock(string id)
+        => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(id)));
+
+    // The ONE place the per-space content lock resource is built (D-4). Zones and items
+    // deliberately share a single resource per space: two resources would preserve B-12's
+    // "one resource per transaction ⇒ cannot deadlock" property only by convention, and
+    // convention is what a future edit breaks. Building the key here makes that property
+    // structural — AddZoneWithinCapAsync and AddItemWithinCapAsync cannot drift apart
+    // because there is no second copy of this string to edit.
+    private static string SpaceContentLockResource(string spaceId)
+        => $"tidansu:space-content:{HashForLock(spaceId)}";
+
+    // The sp_getapplock preamble, in ONE place, shared by all three locked inserts.
+    //
+    // sp_getapplock reports outcome via its stored-procedure RETURN code, not by throwing:
+    // 0/1 = granted, negative = not granted (-1 timeout, -2 cancelled, -3 deadlock victim,
+    // -999 other error). It MUST be captured explicitly — a discarded return value silently
+    // falls through to the caller's count+insert WITHOUT the lock held, reopening the exact
+    // race the lock exists to close, and looking identical to success. That failure mode is
+    // precisely why this lives in one method rather than being hand-copied per call site.
+    //
+    // Materialize via ToListAsync (not SingleAsync/FirstAsync): those compose an extra
+    // TOP(N) wrapper around the SQL, which EF rejects as "non-composable" for a
+    // multi-statement DECLARE/EXEC/SELECT batch. ToListAsync executes the batch as-is.
+    //
+    // The context is registered without EnableRetryOnFailure (see ServiceCollectionExtensions),
+    // so the callers' manual BeginTransactionAsync is safe as-is; if retry-on-failure is ever
+    // enabled, each caller must move inside dbContext.Database.CreateExecutionStrategy().ExecuteAsync(...).
+    private async Task AcquireLockOrThrowAsync(
+        IDbContextTransaction transaction, string resource, string context, CancellationToken cancellationToken)
+    {
+        var lockResults = await dbContext.Database
+            .SqlQuery<int>(
+                $@"DECLARE @res int;
+EXEC @res = sp_getapplock @Resource={resource}, @LockMode='Exclusive', @LockOwner='Transaction', @LockTimeout={5000};
+SELECT @res AS Value;")
+            .ToListAsync(cancellationToken);
+        var lockResult = lockResults.Single();
+        if (lockResult >= 0) return;
+
+        // Fail closed: a non-granted lock is a transient infrastructure condition, not an
+        // at-cap decision, so it must never be reported to the caller as a plan-limit
+        // rejection (that would wrongly tell a paying-eligible user they're capped).
+        // Roll back and surface a genuine error (500 via ErrorHandlingMiddleware).
+        logger.LogError(
+            "Lock not acquired for {LockContext}: sp_getapplock returned {LockResult}",
+            context, lockResult);
+        await transaction.RollbackAsync(cancellationToken);
+        throw new InvalidOperationException(
+            $"Could not acquire lock for {context} (sp_getapplock={lockResult}).");
+    }
 
     public void Remove(Space space) => dbContext.Spaces.Remove(space);
 
-    public async Task ReplaceAsync(Space existing, List<Zone> zones, List<Item> items, CancellationToken cancellationToken = default)
-    {
-        // Delete the old children first so reused ids don't collide with the new set.
-        dbContext.Set<Zone>().RemoveRange(existing.Zones);
-        dbContext.Set<Item>().RemoveRange(existing.Items);
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        foreach (var zone in zones) zone.SpaceId = existing.Id;
-        foreach (var item in items) item.SpaceId = existing.Id;
-        existing.Zones = zones;
-        existing.Items = items;
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
         => dbContext.SaveChangesAsync(cancellationToken);
+
+    // ---- Granular per-entity access (B-15) -----------------------------------
+    //
+    // D-3: every query below is rooted at dbContext.Spaces.Where(s => s.Id ==
+    // spaceId && s.UserId == userId) — there is no overload that resolves a zone
+    // or item by bare id, so an unscoped/cross-user mutation is not expressible
+    // through this repository at all. Zone/Item have no Space navigation (see
+    // TidansuDbContext), so they're reached via s.Zones/s.Items.
+
+    // FR-7 / B-14: renaming a space (or flipping its view/canvas mode) must not
+    // pull every zone and item — including each item's nvarchar(max) photo
+    // data-URL — into memory. Do not reuse GetByIdAsync here; it .Includes both.
+    public Task<Space?> GetByIdWithoutContentAsync(string id, string userId, CancellationToken cancellationToken = default)
+        => dbContext.Spaces
+            .Where(s => s.Id == id && s.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    // Projects straight to a SQL COUNT(*) — no zone/item/photo column leaves the
+    // database, same discipline as GetItemCountsPerSpaceAsync (B-8 SC-1). The
+    // outer filter is what makes a null mean "not found or not owned" rather than
+    // "empty space": an owned space with zero zones also projects to 0, never null.
+    public Task<int?> CountZonesAsync(string spaceId, string userId, CancellationToken cancellationToken = default)
+        => dbContext.Spaces
+            .Where(s => s.Id == spaceId && s.UserId == userId)
+            .Select(s => (int?)s.Zones.Count)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public Task<int?> CountItemsAsync(string spaceId, string userId, CancellationToken cancellationToken = default)
+        => dbContext.Spaces
+            .Where(s => s.Id == spaceId && s.UserId == userId)
+            .Select(s => (int?)s.Items.Count)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    // Deliberately tracked, NOT AsNoTracking(): the handler mutates the returned
+    // entity's fields and calls SaveChangesAsync (see UpdateZoneCommandHandler /
+    // UpdateItemCommandHandler). AsNoTracking() here would make every field
+    // update a silent no-op — looks like an obvious read-path optimisation, is not.
+    public Task<Zone?> GetZoneAsync(string spaceId, string zoneId, string userId, CancellationToken cancellationToken = default)
+        => dbContext.Spaces
+            .Where(s => s.Id == spaceId && s.UserId == userId)
+            .SelectMany(s => s.Zones)
+            .FirstOrDefaultAsync(z => z.Id == zoneId, cancellationToken);
+
+    // Same "deliberately tracked" caveat as GetZoneAsync above.
+    public Task<Item?> GetItemAsync(string spaceId, string itemId, string userId, CancellationToken cancellationToken = default)
+        => dbContext.Spaces
+            .Where(s => s.Id == spaceId && s.UserId == userId)
+            .SelectMany(s => s.Items)
+            .FirstOrDefaultAsync(i => i.Id == itemId, cancellationToken);
+
+    public Task<bool> ZoneExistsInSpaceAsync(string spaceId, string zoneId, string userId, CancellationToken cancellationToken = default)
+        => dbContext.Spaces
+            .Where(s => s.Id == spaceId && s.UserId == userId)
+            .SelectMany(s => s.Zones)
+            .AnyAsync(z => z.Id == zoneId, cancellationToken);
+
+    // Closes the same read-then-insert race as AddWithinSpaceCapAsync, but keyed
+    // per SPACE rather than per user (D-4): two concurrent zone-add requests
+    // against the same space could both read a count under the cap and both
+    // insert. A single sp_getapplock resource per space — shared with
+    // AddItemWithinCapAsync below, NOT a separate resource per dimension — keeps
+    // B-12's "one resource per transaction ⇒ cannot deadlock" argument structural
+    // rather than an invariant a future edit could silently break. Free-only:
+    // Pro's caps are unlimited, so PlanCaps.For(Pro).Zones is null and the
+    // handler calls AddZoneAsync instead, taking no lock and never serializing.
+    // The context is registered without EnableRetryOnFailure (see
+    // ServiceCollectionExtensions), so this manual BeginTransactionAsync is safe
+    // as-is; if retry-on-failure is ever enabled, this must move inside
+    // dbContext.Database.CreateExecutionStrategy().ExecuteAsync(...).
+    public async Task<ContentInsertOutcome> AddZoneWithinCapAsync(Zone zone, string userId, int zoneCap, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        await AcquireLockOrThrowAsync(transaction, SpaceContentLockResource(zone.SpaceId),
+            $"space-content for space {zone.SpaceId}", cancellationToken);
+
+        // Authoritative in-lock re-count, owner-scoped: null means the space was
+        // deleted concurrently (or was never owned by userId) between the
+        // handler's pre-check and this call.
+        var currentCount = await CountZonesAsync(zone.SpaceId, userId, cancellationToken);
+        if (currentCount is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return ContentInsertOutcome.SpaceNotFound;
+        }
+
+        if (currentCount >= zoneCap)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return ContentInsertOutcome.AtCap;
+        }
+
+        dbContext.Set<Zone>().Add(zone);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return ContentInsertOutcome.Inserted;
+    }
+
+    // Same contract and caveats as AddZoneWithinCapAsync above — shares the same
+    // "tidansu:space-content:{spaceId}" lock resource (D-4: one resource per
+    // space covering zones AND items, not two).
+    public async Task<ContentInsertOutcome> AddItemWithinCapAsync(Item item, string userId, int itemCap, CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        // SpaceContentLockResource is what makes D-4 structural: this and
+        // AddZoneWithinCapAsync cannot drift onto two different lock resources,
+        // because there is only one copy of the key to edit.
+        await AcquireLockOrThrowAsync(transaction, SpaceContentLockResource(item.SpaceId),
+            $"space-content for space {item.SpaceId}", cancellationToken);
+
+        var currentCount = await CountItemsAsync(item.SpaceId, userId, cancellationToken);
+        if (currentCount is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return ContentInsertOutcome.SpaceNotFound;
+        }
+
+        if (currentCount >= itemCap)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return ContentInsertOutcome.AtCap;
+        }
+
+        dbContext.Set<Item>().Add(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return ContentInsertOutcome.Inserted;
+    }
+
+    // Unlimited (Pro) path: no lock, no transaction — nothing to serialize
+    // against when the cap is unbounded (mirrors CreateSpaceCommandHandler's
+    // `if (spaceCap is int cap)` branch, which skips AddWithinSpaceCapAsync
+    // entirely for Pro). Ownership is verified with an owner-scoped AnyAsync
+    // before the insert so an unowned/unknown space cannot silently gain a zone.
+    public async Task<bool> AddZoneAsync(Zone zone, string userId, CancellationToken cancellationToken = default)
+    {
+        var owned = await dbContext.Spaces.AnyAsync(s => s.Id == zone.SpaceId && s.UserId == userId, cancellationToken);
+        if (!owned) return false;
+
+        dbContext.Set<Zone>().Add(zone);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> AddItemAsync(Item item, string userId, CancellationToken cancellationToken = default)
+    {
+        var owned = await dbContext.Spaces.AnyAsync(s => s.Id == item.SpaceId && s.UserId == userId, cancellationToken);
+        if (!owned) return false;
+
+        dbContext.Set<Item>().Add(item);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> RemoveZoneWithItemsAsync(string spaceId, string zoneId, string userId, CancellationToken cancellationToken = default)
+    {
+        var zone = await GetZoneAsync(spaceId, zoneId, userId, cancellationToken);
+        if (zone is null) return false;
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        // Set-based on purpose (SC-2): loading the zone's items to RemoveRange
+        // them would materialise every photo data-URL in the zone into memory
+        // just to delete rows — exactly the write/read amplification this task
+        // exists to remove. ExecuteDeleteAsync bypasses the change tracker and
+        // issues a single DELETE, but it also does NOT participate in
+        // SaveChangesAsync, which is why this method opens its own explicit
+        // transaction around both deletes.
+        // zone.SpaceId (not the spaceId parameter) is used here on purpose. This is
+        // one of exactly TWO places in this file that reach an entity without the
+        // (spaceId, userId) filter written inline — the other is RemoveItemAsync,
+        // which instead carries ownership as an EXISTS subquery inside its DELETE.
+        // Neither is a gap in D-3: here, `zone` was itself resolved via the
+        // owner-scoped GetZoneAsync immediately above, so zone.SpaceId is already
+        // owner-verified. (Kept accurate per security review S-L2 — if a third
+        // such place ever appears, D-3 has stopped being structural and this
+        // comment is the tripwire.)
+        await dbContext.Set<Item>()
+            .Where(i => i.SpaceId == zone.SpaceId && i.ZoneId == zoneId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        dbContext.Set<Zone>().Remove(zone);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
+    }
+
+    // Set-based on purpose, for the same reason as RemoveZoneWithItemsAsync's cascade
+    // above (B-8 SC-2): resolving the item first via GetItemAsync would materialise the
+    // whole row — including its nvarchar(max) Photo data-URL, megabytes for a Pro user —
+    // into memory purely to delete it. Ownership stays structural (D-3): the EXISTS
+    // subquery is part of the DELETE's WHERE, so an item is only ever removed when its
+    // space is owned by userId. A cross-user or unknown id both affect 0 rows and return
+    // false, which the handler turns into the same 404 — no divergence that would
+    // confirm the id exists.
+    public async Task<bool> RemoveItemAsync(string spaceId, string itemId, string userId, CancellationToken cancellationToken = default)
+    {
+        var deleted = await dbContext.Set<Item>()
+            .Where(i => i.Id == itemId
+                        && dbContext.Spaces.Any(s => s.Id == spaceId && s.Id == i.SpaceId && s.UserId == userId))
+            .ExecuteDeleteAsync(cancellationToken);
+        return deleted > 0;
+    }
 }

@@ -11,3 +11,4 @@
 - [Race-condition hardening scoping (B-12)](race-condition-hardening-b12.md) — short-note pattern for concurrency/atomicity fixes on plan-gating surfaces; recommend identical UX for race-lost requests
 - [Content-validation cap scoping (B-13)](content-validation-caps-b13.md) — when a fix needs invented new caps/formats (no DB/business precedent), use full FR doc not a short note; ground values via DbContext HasMaxLength grep + frontend producer grep
 - [Usage-counts projection scoping (B-14)](usage-counts-projection-b14.md) — short-note pattern for read-path perf fixes with no behaviour change; confirmed 3-call-site scope for shared UsageDto.From pattern
+- [Granular endpoints scoping (B-15)](granular-endpoints-b15.md) — heavy-template precedent (not LIGHT-path); cascade-delete, not-found-for-ownership, scalar-field-own-endpoint, retire-not-coexist decisions

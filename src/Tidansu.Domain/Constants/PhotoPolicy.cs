@@ -12,6 +12,17 @@ public enum PhotoRejection
     TooLarge,
 }
 
+// How an item's photo field moved between the persisted value and the incoming one.
+// A photo concept, not a plan concept (see PlanPolicy.CheckItemPhotoChange, which
+// consumes this) — kept here so PlanPolicy stays free of blob strings.
+public enum PhotoChange
+{
+    None,
+    Added,
+    Replaced,
+    Removed,
+}
+
 // Validates an item's photo — a base64 data URL — without ever materialising a
 // multi-MB byte[]. Pure and static: no DB, no mocks, span-based parsing (no regex —
 // a regex over an attacker-controlled ~7 MB string is a ReDoS vector). Cheap rejects
@@ -121,6 +132,36 @@ public static class PhotoPolicy
         }
 
         return PhotoRejection.None;
+    }
+
+    // Classifies how an item's photo field moved between the persisted value
+    // (existing) and the incoming one (incoming) for a single-item PUT/POST — the
+    // input PlanPolicy.CheckItemPhotoChange gates on. Pure, no I/O. photo and existing
+    // are client-controlled/persisted blob strings verbatim — never log or interpolate
+    // either argument (B-13 S-5).
+    //
+    // Two rules here are load-bearing (see D-2 in tech-tasks.md):
+    //
+    // 1. null is the ONLY "no photo" — do NOT use string.IsNullOrEmpty. Today's photo
+    //    count is `Items.Count(i => i.Photo is not null)`, so an empty string "" is
+    //    already counted as a photo (PhotoPolicy.Check("") returns Empty, i.e. an
+    //    *invalid* photo, not *no* photo). PhotoChangeBetween(null, "") therefore
+    //    MUST be Added, not None — otherwise a Free user sending photo: "" would skip
+    //    the plan gate entirely and hit SpacePhotoGuard's 400 instead of the 403
+    //    paywall, inverting B-13's deliberate ordering (gate before guard).
+    // 2. An identical resent photo MUST be None. The client PUTs the whole item, so a
+    //    downgraded Free user merely renaming a photo-bearing item resends the same
+    //    photo string unchanged. Treating any non-null photo on Free as a rejection
+    //    would make every such item permanently uneditable post-downgrade — the real
+    //    form of the "naive count>=cap rule breaks downgraded editing" trap on the
+    //    photo axis. Uses ordinal comparison — a photo is opaque data, not text to
+    //    compare culture-aware.
+    public static PhotoChange PhotoChangeBetween(string? existing, string? incoming)
+    {
+        if (existing is null && incoming is null) return PhotoChange.None;
+        if (existing is null) return PhotoChange.Added; // incoming non-null, including ""
+        if (incoming is null) return PhotoChange.Removed;
+        return string.Equals(existing, incoming, StringComparison.Ordinal) ? PhotoChange.None : PhotoChange.Replaced;
     }
 
     private static bool TryNormalizeAllowedMediaType(ReadOnlySpan<char> mediaType, out string normalized)

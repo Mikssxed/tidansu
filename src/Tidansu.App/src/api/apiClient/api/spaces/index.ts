@@ -4,7 +4,7 @@
 // @ts-ignore
 import { createProblemDetailsFromDiscriminatorValue, createSpaceDtoApiOperationResultFromDiscriminatorValue, createSpaceDtoListApiOperationResultFromDiscriminatorValue, serializeSpaceDto, serializeSpaceDtoApiOperationResult, type ProblemDetails, type SpaceDto, type SpaceDtoApiOperationResult, type SpaceDtoListApiOperationResult } from '../../models/index.js';
 // @ts-ignore
-import { SpacesItemRequestBuilderRequestsMetadata, type SpacesItemRequestBuilder } from './item/index.js';
+import { SpacesItemRequestBuilderNavigationMetadata, SpacesItemRequestBuilderRequestsMetadata, type SpacesItemRequestBuilder } from './item/index.js';
 // @ts-ignore
 import { type BaseRequestBuilder, type KeysToExcludeForNavigationMetadata, type NavigationMetadata, type Parsable, type ParsableFactory, type RequestConfiguration, type RequestInformation, type RequestsMetadata } from '@microsoft/kiota-abstractions';
 
@@ -54,6 +54,7 @@ export const SpacesRequestBuilderUriTemplate = "{+baseurl}/api/spaces";
 export const SpacesRequestBuilderNavigationMetadata: Record<Exclude<keyof SpacesRequestBuilder, KeysToExcludeForNavigationMetadata>, NavigationMetadata> = {
     byId: {
         requestsMetadata: SpacesItemRequestBuilderRequestsMetadata,
+        navigationMetadata: SpacesItemRequestBuilderNavigationMetadata,
         pathParametersMappings: ["id"],
     },
 };
