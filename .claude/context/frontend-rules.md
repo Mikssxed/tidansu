@@ -1,5 +1,16 @@
 # Frontend Rules
 
+> **Grounding:** the conventions (variant maps, template-purity, static Tailwind,
+> `computed`, TanStack Query, `@theme` tokens) are all correct and current. But
+> some **concrete lists and examples below are stale** SelfGrind leftovers — the
+> structure diagram lists `form/`, `icons/`, `schemas/` dirs and `useForm` /
+> `useFormErrors` / `useNavigation` composables that **do not exist**, the
+> composables/stores tables are out of date, and examples reference `Task`/`Quest`/
+> `api.tasks`. For the **real** component/composable/store exemplars to copy — and
+> the correct current file set — see **`.claude/context/patterns.md`**. Real API
+> calls go through feature composables like `useSpacesApi` (e.g.
+> `apiClient.api.spaces...`), not `api.tasks`.
+
 ## Project Structure
 
 ```
@@ -11,7 +22,7 @@ src/Tidansu.App/src/
 ├── components/
 │   ├── base/                   ← shared UI primitives (Button, Badge, Icon, etc.)
 │   ├── form/                   ← form components (TextField, FormField)
-│   ├── layout/                 ← SidebarLayout, AppLayout
+│   ├── layout/                 ← AppLayout, AppNav, PlainLayout
 │   ├── icons/                  ← SVG icon components
 │   └── <feature>/              ← feature-specific components per domain area
 ├── composables/                ← useApiClient, useAuth, useForm, useNavigation
@@ -35,7 +46,7 @@ Always use `<script setup lang="ts">`.
 Define a `variant` (and optionally `size`) prop as a union type. Map variants to **complete static class strings** using `Record`:
 
 ```typescript
-export type CardVariant = 'default' | 'info' | 'violet' | 'success';
+export type CardVariant = 'neutral' | 'pro' | 'warn' | 'danger' | 'ok';
 
 interface CardProps {
     variant?: CardVariant;
@@ -44,25 +55,20 @@ interface CardProps {
 }
 
 const props = withDefaults(defineProps<CardProps>(), {
-    variant: 'default',
+    variant: 'neutral',
 });
 
-const bgClasses: Record<CardVariant, string> = {
-    default: 'bg-primary-900',
-    info: 'bg-info-500/30',
-    violet: 'bg-violet-500/30',
-    success: 'bg-success-500/30',
-};
-
-const borderClasses: Record<CardVariant, string> = {
-    default: 'border-primary-600',
-    info: 'border-info-500',
-    violet: 'border-violet-500',
-    success: 'border-success-500',
+// Real @theme tokens — mirror BaseBadge.vue
+const variantClasses: Record<CardVariant, string> = {
+    neutral: 'bg-surface-2 text-text-2 border-border',
+    pro: 'bg-pro/15 text-pro border-pro/30',
+    warn: 'bg-warn/15 text-warn border-warn/30',
+    danger: 'bg-danger/15 text-danger border-danger/30',
+    ok: 'bg-ok/15 text-ok border-ok/30',
 };
 
 const containerClass = computed(() =>
-    twMerge('flex flex-col p-4 rounded-xl border', bgClasses[props.variant], borderClasses[props.variant])
+    twMerge('flex flex-col p-4 rounded-card border', variantClasses[props.variant])
 );
 ```
 
@@ -124,8 +130,8 @@ const cls = `bg-${props.color}-500`;
 
 // CORRECT — full class string in Record map
 const bgMap: Record<Variant, string> = {
-    info: 'bg-info-500',
-    error: 'bg-error-500',
+    warn: 'bg-warn',
+    danger: 'bg-danger',
 };
 ```
 
@@ -135,33 +141,32 @@ const bgMap: Record<Variant, string> = {
 
 All colors are defined as tokens in `src/style.css` under `@theme`.
 
-### Available semantic colors
-- `error-500` — red/danger (#ef4444)
-- `info-500` — blue (#3b82f6)
-- `violet-500` — violet (#8b5cf6)
-- `warning-500` — yellow (#eab308)
-- `success-500` — green (#22c55e)
-- `orange-500` — orange (#f97316)
-- `accent-500` / `accent-700` — indigo
-- `secondary-500` / `secondary-700` — purple
-- `primary-900` / `primary-800` / `primary-600` / `primary-500` / `primary-400` / `primary-200`
-- Dark bg variants: `orange-900`, `blue-900`, `green-900`, `purple-900`, `crimson-900`
+### Available semantic colors (the REAL `style.css @theme` tokens)
+> The `*-500` / `primary-900` list that used to be here was stale SelfGrind text and
+> those tokens don't exist. The current tokens are the storebook OKLCH dark-warm set:
+- Surfaces: `bg`, `surface`, `surface-2`, `surface-3` → `bg-surface-2`, …
+- Text: `text`, `text-2`, `text-3` → `text-text-2`, …
+- Borders: `border`, `border-faint`, `border-strong` → `border-border`, …
+- Semantic: `warn`, `danger`, `ok`, `pro` → `text-warn`, `bg-danger`, `bg-pro/15`, …
+- Primary (buttons): `pri-bg`, `pri-fg` → `bg-pri-bg text-pri-fg`
+- Zones: `zone-amber`, `zone-blue`, `zone-gray`, `zone-green`, `zone-pink` → `bg-zone-blue`
+- Radii: `rounded-ctrl`, `rounded-chip`, `rounded-card`
 
 ### Opacity modifiers (preferred over RGBA)
 ```html
 <!-- CORRECT -->
-<div class="bg-info-500/30 border-b-violet-500/50">
+<div class="bg-warn/15 border-b-warn/50">
 
 <!-- WRONG — use theme tokens, not hex -->
 <div style="background: rgba(59, 130, 246, 0.3)">
 ```
 
-### Gradient utilities
-```html
-<div class="bg-gradient-purple">         <!-- indigo → purple -->
-<div class="bg-gradient-midnight">       <!-- dark blue gradient -->
-<span class="text-gradient-accent">      <!-- gradient text -->
-```
+### Gradients
+There are **no predefined `bg-gradient-*` / `text-gradient-*` utilities** in
+`style.css` (the `gradient-purple`/`gradient-midnight`/`gradient-accent` ones were
+stale SelfGrind text). If a design needs a gradient, build it with Tailwind's
+`bg-gradient-to-*` + `@theme` color stops, or add a named utility to `style.css`
+first.
 
 ### Never hardcode colors
 Do not pass hex values as props or use them inline. Add new colors to `style.css @theme` first.
@@ -196,12 +201,13 @@ export const AppViews = {
 export type AppRouteNames = keyof typeof AppViews;
 
 // 2. Register route using createRoute()
-createRoute('/my-feature', 'myFeature', LayoutType.WITH_SIDEBAR, true)
-// path, name (must match AppViews key), layoutType, requiresAuth
+createRoute('/my-feature', 'myFeature', LayoutType.APP, true)
+// path, name (must match AppViews key), layoutType, requiresAuth[, propsFromParams]
 ```
 
-`LayoutType.WITH_SIDEBAR` — shows sidebar navigation.
-`LayoutType.WITHOUT_SIDEBAR` — full-width layout (auth pages).
+`LayoutType.APP` — app chrome/nav (`AppLayout.vue` + `AppNav.vue`).
+`LayoutType.PLAIN` — full-width, no chrome (`PlainLayout.vue`; auth, create-space,
+space editor). *(There is no `WITH_SIDEBAR`/`WITHOUT_SIDEBAR` — that was stale.)*
 
 ---
 
@@ -213,7 +219,7 @@ The Kiota client is a singleton factory. Never instantiate it directly:
 import { useApiClient } from '@/composables/useApiClient';
 
 const apiClient = useApiClient();
-const result = await apiClient.api.tasks.post(command);
+const result = await apiClient.api.spaces.post(command);
 ```
 
 After any backend endpoint change, regenerate the client:

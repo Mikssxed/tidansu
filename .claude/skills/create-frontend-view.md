@@ -2,6 +2,13 @@
 
 Use this to add a new page/view to the Vue frontend.
 
+> **Grounding:** copy a real view — `SpaceView.vue`, `DashboardView.vue` (see
+> `.claude/context/patterns.md`). The layout enum has **two** values:
+> `LayoutType.APP` (chrome/nav) and `LayoutType.PLAIN` (full-width — auth, create,
+> space editor). There is **no `WITH_SIDEBAR`/`WITHOUT_SIDEBAR` and no
+> `SidebarLayout`** — those are stale. Real layouts: `AppLayout.vue`, `AppNav.vue`,
+> `PlainLayout.vue`.
+
 ---
 
 ## Step 1 — Create the View File
@@ -58,25 +65,22 @@ The key must match the route `name`. Use camelCase.
 
 ### Add route using createRoute()
 ```typescript
-createRoute('/{feature-path}', '{featureName}', LayoutType.WITH_SIDEBAR, true),
-// args: path, name (AppViews key), layoutType, requiresAuth
+createRoute('/{feature-path}', '{featureName}', LayoutType.APP, true),
+// args: path, name (AppViews key), layoutType, requiresAuth[, propsFromParams]
 ```
 
-Use `LayoutType.WITHOUT_SIDEBAR` for auth pages (login, register).
-Use `requiresAuth = false` for public pages.
+Use `LayoutType.PLAIN` for auth/full-width pages (login, create-space, space editor).
+Use `requiresAuth = false` for public pages (landing, pricing).
 
 ---
 
-## Step 3 — Add to Sidebar (if applicable)
+## Step 3 — Navigation (if applicable)
 
-If the new view should appear in the sidebar navigation, update `SidebarLayout.vue` to include a nav link:
+If the view should be reachable from the app chrome, add the link in `AppNav.vue`
+(there is no sidebar). Navigate with a named route:
 
 ```vue
-<SidebarNavItem
-    :to="{ name: '{featureName}' }"
-    label="{Feature Name}"
-    icon="{icon-name}"
-/>
+<RouterLink :to="{ name: '{featureName}' }">{Feature Name}</RouterLink>
 ```
 
 ---
@@ -99,16 +103,16 @@ If the new view should appear in the sidebar navigation, update `SidebarLayout.v
 
 ## Route with Props (dynamic param)
 
-If the view needs a route param (e.g., `/tasks/:id`):
+If the view needs a route param (e.g., `/spaces/:id` → `SpaceView.vue`):
 
 ```typescript
-// router/index.ts
-createRoute('/tasks/:id', 'taskDetail', LayoutType.WITH_SIDEBAR, true, true)
+// router/index.ts — this is the real space route
+createRoute('/spaces/:id', 'space', LayoutType.PLAIN, true, true)
 // Last `true` enables props: true (route params passed as props)
 ```
 
 ```vue
-<!-- TaskDetailView.vue -->
+<!-- SpaceView.vue -->
 <script setup lang="ts">
 const props = defineProps<{
     id: string;

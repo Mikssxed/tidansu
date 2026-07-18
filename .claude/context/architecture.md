@@ -2,6 +2,12 @@
 
 Tidansu uses **Clean Architecture** with **CQRS** and **MediatR** on the backend, and **Vue 3 + Composition API** on the frontend.
 
+> **Grounding:** the layer model below is accurate, but some file/type *names* in
+> the older examples are stale SelfGrind leftovers (`TaskItem`, `TasksController`,
+> `ITasksRepository`). The real domain is **Space → Zone → Item** (+ Account, Auth,
+> Billing, Plans). For the current file-by-file exemplars to copy, see
+> **`.claude/context/patterns.md`**.
+
 ---
 
 ## Backend Projects
@@ -16,10 +22,10 @@ Tidansu.API             ← depends on Application + Infrastructure
 ### Tidansu.Domain
 - **Purpose:** Core business logic. Has zero dependencies on other projects.
 - **Contains:**
-  - `Entities/` — domain models (`TaskItem`, `TaskSchedule`, `TaskOccurrence`, `User`)
-  - `Constants/` — enums (`BaseAttribute`, `TaskRepetitionType`, `TaskOccurrenceStatus`, `UserRoles`)
-  - `Exceptions/` — domain exceptions (`NotFoundException`, `ValidationException`, `ForbidException`, `AuthenticationException`)
-  - `Interfaces/Repositories/` — repository contracts (`ITasksRepository`)
+  - `Entities/` — domain models (`Space`, `Zone`, `Item`, `User`, `MagicLinkToken`, `RefreshToken`, `ProcessedStripeEvent`)
+  - `Enums/` — `Plan`; `Constants/` — plan logic (`PlanPolicy`, `PlanCaps`, `PlanLimits`, `PhotoPolicy`, `ItemCaps`)
+  - `Exceptions/` — domain exceptions (`NotFoundException`, `ValidationException`, `ForbidException`, `AuthenticationException`, `PlanLimitException`, `MagicLinkThrottledException`, `BillingUnavailableException`, `EmailDeliveryException`)
+  - `Interfaces/` + `Repositories/` — service & repository contracts (`ISpacesRepository`, `IJwtService`, `IBillingService`, `IEmailService`, …)
 
 ### Tidansu.Application
 - **Purpose:** Use cases (CQRS). Orchestrates domain objects without knowing infrastructure details.
@@ -42,7 +48,7 @@ Tidansu.API             ← depends on Application + Infrastructure
 ### Tidansu.API
 - **Purpose:** HTTP layer. Controllers delegate directly to MediatR.
 - **Contains:**
-  - `Controllers/` — `TasksController`, `IdentityController`
+  - `Controllers/` — `SpacesController`, `SpaceZonesController`, `SpaceItemsController`, `AccountController`, `AuthController`, `BillingController`, `PlansController`
   - `Middlewares/ErrorHandlingMiddleware.cs` — maps domain exceptions to HTTP responses
   - `Models/ApiOperationResult.cs` — standard response wrapper
   - `Extensions/WebApplicationBuilderExtensions.cs` — registers auth, Swagger, CORS, Serilog
@@ -82,7 +88,7 @@ Tidansu.App/src/
 ├── views/               ← page-level components (one per route)
 ├── components/
 │   ├── base/            ← shared UI primitives
-│   ├── layout/          ← SidebarLayout, AppLayout
+│   ├── layout/          ← AppLayout, AppNav, PlainLayout
 │   └── <feature>/       ← feature-specific components
 ├── composables/         ← useApiClient, useAuth, useForm, useNavigation
 ├── stores/              ← Pinia stores (useAuthStore)

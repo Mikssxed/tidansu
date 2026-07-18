@@ -2,6 +2,15 @@
 
 Use this when improving existing backend code: enforcing CQRS separation, correcting layer violations, or improving readability.
 
+> **Grounding:** the `CreateTask`/`TaskItem`/`dbContext.Tasks`/`ITasksRepository`
+> names in the before/after snippets below are **illustrative only** — the real
+> domain is **Space → Zone → Item** and the reference handler is
+> `AddZoneCommandHandler` (see `.claude/context/patterns.md`). The layering
+> *principles* shown are correct, but note two Tidansu specifics the snippets
+> gloss over: Spaces DTOs map via **static `ToEntity`/`FromEntity`** (not
+> `mapper.Map<>`), and a correct mutating handler also enforces **owner-scope-first
+> 404** and a **plan-gate before the mutation**.
+
 ---
 
 ## Common Refactoring Scenarios

@@ -2,6 +2,12 @@
 
 Use this skill to add a complete backend feature: domain entity (if needed), CQRS command or query, handler, validation, repository, and API endpoint.
 
+> **Grounding:** the end-to-end reference feature is **Spaces** — walk
+> `Spaces/Commands/AddZone/` → `Dtos/ZoneDto.cs` → `ISpacesRepository` /
+> `SpacesRepository` → `SpaceZonesController`. See `.claude/context/patterns.md` for
+> the exemplar index and the three mutating-handler invariants (owner-scope →
+> plan-gate → atomic cap) every content-creating feature must enforce.
+
 ---
 
 ## Step 1 — Clarify Requirements
@@ -21,7 +27,7 @@ Create the entity in `Tidansu.Domain/Entities/{EntityName}.cs`.
 
 Follow the pattern in [create-domain-entity.md](create-domain-entity.md).
 
-If the entity needs a repository, create the interface in `Tidansu.Domain/Interfaces/Repositories/I{Entity}Repository.cs`.
+If the entity needs a repository, create the interface in `Tidansu.Domain/Repositories/I{Entity}Repository.cs` (namespace `Tidansu.Domain.Repositories`).
 
 ---
 
@@ -36,9 +42,12 @@ Files go in:
 
 ---
 
-## Step 4 — AutoMapper Profile (if mapping entity ↔ command/DTO)
+## Step 4 — DTO mapping (entity ↔ command/DTO)
 
-Create or update `Tidansu.Application/{Feature}/Dtos/{Feature}Profile.cs`:
+**Prefer the Spaces convention: hand-written static mapping** — put
+`FromEntity(entity)` + `ToEntity(...)` on the DTO (see `Spaces/Dtos/ZoneDto.cs`).
+Use AutoMapper only in features that already do. The AutoMapper profile shape, if
+you need it, is `Tidansu.Application/{Feature}/Dtos/{Feature}Profile.cs`:
 
 ```csharp
 public class {Feature}Profile : Profile

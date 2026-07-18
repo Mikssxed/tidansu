@@ -2,6 +2,16 @@
 
 Use this to create a new Vue component — either a shared base primitive or a feature-specific component.
 
+> **Grounding:** copy a real base primitive — `BaseBadge.vue` or `BaseButton.vue`
+> — for the exact variant/token convention (see `.claude/context/patterns.md`).
+> **Use the real theme tokens** (from `style.css @theme`): surfaces `bg` /
+> `surface` / `surface-2` / `surface-3`; text `text` / `text-2` / `text-3`;
+> borders `border` / `border-faint` / `border-strong`; semantic `warn` / `danger` /
+> `ok` / `pro`; primary `pri-bg` / `pri-fg`; zones `zone-amber|blue|gray|green|pink`;
+> radii `rounded-ctrl` / `rounded-chip` / `rounded-card`. **The `info-500` /
+> `primary-900` / `success-500` tokens in older examples do NOT exist** — they were
+> SelfGrind tokens and produce no CSS.
+
 ---
 
 ## Decide: Base or Feature Component?
@@ -10,7 +20,7 @@ Use this to create a new Vue component — either a shared base primitive or a f
 |---------------|-------------------|
 | Pure UI, no domain logic | Domain-specific presentation |
 | `src/components/base/` | `src/components/{feature}/` |
-| Examples: Button, Badge, Card, Icon | Examples: TaskCard, CharacterStats, DailyHabit |
+| Examples: BaseButton, BaseBadge, BaseCard, BaseIcon | Examples: SpaceCard, ItemRow, UsageMeter |
 | No domain imports | May import base components |
 | Exported variant types used widely | Exported types used by parent view/feature |
 
@@ -24,7 +34,7 @@ import { computed } from 'vue';
 import { twMerge } from 'tailwind-merge';
 
 // 1. Export types so parent components can reference them
-export type {Component}Variant = 'default' | 'info' | 'success' | 'warning' | 'error';
+export type {Component}Variant = 'neutral' | 'pro' | 'warn' | 'danger' | 'ok';
 
 // 2. Define props interface — never use `any`
 interface {Component}Props {
@@ -36,40 +46,29 @@ interface {Component}Props {
 
 // 3. Set defaults
 const props = withDefaults(defineProps<{Component}Props>(), {
-    variant: 'default',
+    variant: 'neutral',
 });
 
-// 4. Map variants to COMPLETE static class strings (never dynamic interpolation)
-const bgClasses: Record<{Component}Variant, string> = {
-    default: 'bg-primary-900',
-    info: 'bg-info-500/30',
-    success: 'bg-success-500/30',
-    warning: 'bg-warning-500/30',
-    error: 'bg-error-500/30',
-};
-
-const textClasses: Record<{Component}Variant, string> = {
-    default: 'text-primary-200',
-    info: 'text-info-500',
-    success: 'text-success-500',
-    warning: 'text-warning-500',
-    error: 'text-error-500',
+// 4. Map variants to COMPLETE static class strings using REAL @theme tokens
+//    (never dynamic interpolation, never hex, never info-500/primary-900)
+const variantClasses: Record<{Component}Variant, string> = {
+    neutral: 'bg-surface-2 text-text-2 border-border',
+    pro: 'bg-pro/15 text-pro border-pro/30',
+    warn: 'bg-warn/15 text-warn border-warn/30',
+    danger: 'bg-danger/15 text-danger border-danger/30',
+    ok: 'bg-ok/15 text-ok border-ok/30',
 };
 
 // 5. Use computed() for derived class strings — use twMerge() to merge safely
 const containerClass = computed(() =>
-    twMerge('flex flex-col p-4 rounded-xl', bgClasses[props.variant])
-);
-
-const labelClass = computed(() =>
-    twMerge('text-sm font-medium', textClasses[props.variant])
+    twMerge('flex flex-col gap-1 p-4 rounded-card border', variantClasses[props.variant])
 );
 </script>
 
 <template>
     <div :class="containerClass">
-        <span :class="labelClass">{{ label }}</span>
-        <span v-if="value" class="text-2xl font-bold text-white">{{ value }}</span>
+        <span class="text-sm font-medium">{{ label }}</span>
+        <span v-if="value" class="text-2xl font-bold text-text">{{ value }}</span>
         <!-- Use <slot> for content projection -->
         <slot />
     </div>
@@ -80,22 +79,27 @@ const labelClass = computed(() =>
 
 ## Color Rules
 
-Use theme tokens only — **never hardcode hex values**:
+Use theme tokens only — **never hardcode hex, never use SelfGrind `*-500` tokens**:
 
 ```typescript
-// CORRECT
+// CORRECT — real @theme tokens with opacity modifiers
 const bgMap = {
-    info: 'bg-info-500/30',      // Opacity modifier
-    error: 'bg-error-500/30',
+    warn: 'bg-warn/15',
+    danger: 'bg-danger/15',
 };
 
-// WRONG
-const bgMap = {
-    info: 'bg-[#3b82f6]/30',     // Hardcoded hex — forbidden
-};
+// WRONG — hardcoded hex is forbidden
+const bgMap = { warn: 'bg-[#eab308]/30' };
+
+// WRONG — these tokens do not exist in style.css (produce no CSS)
+const bgMap = { info: 'bg-info-500/30', default: 'bg-primary-900' };
 ```
 
-Available token classes: `bg-info-500`, `bg-error-500`, `bg-success-500`, `bg-warning-500`, `bg-violet-500`, `bg-accent-500`, `bg-primary-900`, etc.
+Available token classes (from `style.css @theme`): `bg-bg`, `bg-surface`,
+`bg-surface-2`, `bg-surface-3`, `text-text`, `text-text-2`, `text-text-3`,
+`text-warn`, `text-danger`, `text-ok`, `text-pro`, `border-border`,
+`border-border-strong`, `bg-pri-bg`, `text-pri-fg`,
+`bg-zone-blue` / `zone-green` / `zone-amber` / `zone-pink` / `zone-gray`.
 
 ---
 
@@ -105,23 +109,23 @@ For components that need different color aspects per variant:
 
 ```typescript
 const bgClasses: Record<Variant, string> = {
-    info: 'bg-info-900/40',
-    success: 'bg-success-900/40',
+    warn: 'bg-warn/15',
+    ok: 'bg-ok/15',
 };
 
 const borderClasses: Record<Variant, string> = {
-    info: 'border-b-info-500',
-    success: 'border-b-success-500',
+    warn: 'border-b-warn',
+    ok: 'border-b-ok',
 };
 
 const iconClasses: Record<Variant, string> = {
-    info: 'text-info-500',
-    success: 'text-success-500',
+    warn: 'text-warn',
+    ok: 'text-ok',
 };
 
 const containerClass = computed(() =>
     twMerge(
-        'flex items-center gap-3 p-4 rounded-xl border-b-4',
+        'flex items-center gap-3 p-4 rounded-card border-b-4',
         bgClasses[props.variant],
         borderClasses[props.variant]
     )
@@ -184,11 +188,11 @@ Tailwind v4 uses static scanning:
 
 ```typescript
 // WRONG — class won't be in CSS bundle
-const cls = `text-${props.color}-500`;
+const cls = `text-${props.color}`;
 
 // CORRECT — full static string in Record
 const colorMap: Record<Variant, string> = {
-    info: 'text-info-500',
-    error: 'text-error-500',
+    warn: 'text-warn',
+    danger: 'text-danger',
 };
 ```

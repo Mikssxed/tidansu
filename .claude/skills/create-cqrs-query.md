@@ -2,6 +2,11 @@
 
 Use this for any operation that **reads data without side effects** (get, list, search).
 
+> **Grounding:** the real query to copy is
+> `Tidansu.Application/Spaces/Queries/GetSpace/` (see `.claude/context/patterns.md`).
+> Read handlers must be **owner-scoped** — filter by the current `userId` and 404
+> anything the user doesn't own. Spaces DTOs use static `FromEntity`, not AutoMapper.
+
 ---
 
 ## File Structure
@@ -18,10 +23,10 @@ Optionally add a validator if input needs checking:
 {QueryName}QueryValidator.cs
 ```
 
-Example feature=`Tasks`, QueryName=`GetTasks`:
+Example feature=`Spaces`, QueryName=`GetSpaces`:
 ```
-Tidansu.Application/Tasks/Queries/GetTasks/GetTasksQuery.cs
-Tidansu.Application/Tasks/Queries/GetTasks/GetTasksQueryHandler.cs
+Tidansu.Application/Spaces/Queries/GetSpaces/GetSpacesQuery.cs
+Tidansu.Application/Spaces/Queries/GetSpaces/GetSpacesQueryHandler.cs
 ```
 
 ---
@@ -75,7 +80,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Tidansu.Application.User;
 using Tidansu.Domain.Exceptions;
-using Tidansu.Domain.Interfaces.Repositories;
+using Tidansu.Domain.Repositories;   // repository interfaces live in Domain/Repositories/
 
 namespace Tidansu.Application.{Feature}.Queries.{QueryName};
 
@@ -103,7 +108,7 @@ public class {QueryName}QueryHandler(
 
 Add the read method to the domain interface:
 ```csharp
-// Tidansu.Domain/Interfaces/Repositories/I{Entity}Repository.cs
+// Tidansu.Domain/Repositories/I{Entity}Repository.cs  (namespace Tidansu.Domain.Repositories)
 Task<IEnumerable<{Entity}>> GetAll(string userId);
 Task<{Entity}?> GetById(Guid id, string userId);
 ```

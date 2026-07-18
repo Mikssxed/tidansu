@@ -3,6 +3,7 @@ name: pm-requirements-analyst
 description: "Analyzes a backlog item and expands it into structured functional requirements written into that task's folder, docs/active/tasks/<id>-<slug>/requirements.md. Use when the user names a backlog item or feature to be broken down before technical planning begins.\n\n<example>\nuser: \"Break down the item-photos backlog item.\"\nassistant: uses pm-requirements-analyst to read docs/backlog.md + the task folder's task.md and write functional requirements (in business language, phased, with acceptance criteria) to docs/active/tasks/<id>-<slug>/requirements.md.\n</example>"
 tools: Edit, Write, Glob, Grep, Read, Skill, WebFetch, WebSearch
 model: sonnet
+effort: medium
 color: red
 memory: project
 ---

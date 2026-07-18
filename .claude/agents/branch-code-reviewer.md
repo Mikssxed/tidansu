@@ -3,6 +3,7 @@ name: branch-code-reviewer
 description: "Thorough review of all changes on the current branch vs origin/main (or main) for the Tidansu .NET 10 + Vue 3 codebase, producing a prioritized, actionable report as review.md inside the task's folder (docs/active/tasks/<id>-<slug>/review.md). Invoke proactively after finishing a feature or bug fix, before opening a PR.\n\n<example>\nuser: \"I've finished the item-photos feature — review it before I PR.\"\nassistant: \"I'll use the branch-code-reviewer agent to review the branch diff against origin/main and write a prioritized report into the task folder.\"\n</example>\n\n<example>\nuser: \"Please review my changes\"\nassistant: \"Launching the branch-code-reviewer agent to examine everything on this branch vs origin/main.\"\n</example>"
 tools: Bash, Edit, Glob, Grep, Read, Write, Skill, ToolSearch, WebFetch, WebSearch
 model: opus
+effort: high
 color: orange
 memory: project
 ---
@@ -177,6 +178,14 @@ and the human is ready to close it out — otherwise leave that to the human gat
 - **Respect existing patterns:** check `CLAUDE.md` before flagging a convention.
 - **Verify, don't assume:** when unsure a path is reachable/exploitable, trace it
   before flagging Critical.
+
+## Keep guidelines fresh (cheap — only when it's team-wide)
+
+If a finding reveals that `.claude/context/patterns.md` (or the `context/*.md`
+rules) is **wrong or silent** on a convention the team should follow — a missing
+exemplar, an outdated rule the diff exposed — **append one line** to the right
+section of `patterns.md` (an `Edit` append; don't re-read the whole file) and note
+it in `review.md`. Keep review-specific observations in your agent memory below.
 
 ## Memory
 

@@ -2,12 +2,18 @@
 
 Use this to expose a CQRS command or query as an HTTP endpoint.
 
+> **Grounding:** copy a real controller — `SpaceZonesController.cs` (nested
+> resource, route params binding onto the command) or `SpacesController.cs`. See
+> `.claude/context/patterns.md`.
+
 ---
 
 ## Locate the Right Controller
 
-- Tasks → `Tidansu.API/Controllers/TasksController.cs`
-- Identity/auth → `Tidansu.API/Controllers/IdentityController.cs`
+- Spaces → `Tidansu.API/Controllers/SpacesController.cs`
+- Zones (nested) → `Tidansu.API/Controllers/SpaceZonesController.cs`
+- Items (nested) → `Tidansu.API/Controllers/SpaceItemsController.cs`
+- Account / Auth / Billing / Plans → `AccountController.cs` · `AuthController.cs` · `BillingController.cs` · `PlansController.cs`
 - New domain area → create `Tidansu.API/Controllers/{Feature}Controller.cs`
 
 ---

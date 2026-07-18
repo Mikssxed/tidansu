@@ -2,6 +2,11 @@
 
 Use this to add a new entity to `Tidansu.Domain/Entities/`.
 
+> **Grounding:** copy a real entity — `Space.cs`, `Zone.cs`, `Item.cs` (see
+> `.claude/context/patterns.md`). Repository **interfaces** live in
+> `Tidansu.Domain/Repositories/` (namespace `Tidansu.Domain.Repositories`), **not**
+> in an `Interfaces/Repositories/` subfolder.
+
 ---
 
 ## Rules
@@ -46,8 +51,8 @@ public class {EntityName}
 ## Repository Interface (Domain layer)
 
 ```csharp
-// Tidansu.Domain/Interfaces/Repositories/I{EntityName}Repository.cs
-namespace Tidansu.Domain.Interfaces.Repositories;
+// Tidansu.Domain/Repositories/I{EntityName}Repository.cs
+namespace Tidansu.Domain.Repositories;
 
 public interface I{EntityName}Repository
 {

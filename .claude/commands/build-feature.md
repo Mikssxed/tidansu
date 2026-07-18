@@ -19,6 +19,15 @@ previous stage exists and the human has approved it.
 If `$ARGUMENTS` is empty, read `docs/backlog.md` and propose the highest-priority
 `unprocessed` item, then confirm with the user before starting.
 
+## Step 0 — snapshot the working tree first
+
+Before any stage runs, capture the tree with `git status --short` and remember
+which files were **already** modified/untracked going in. When you report Stage 3
+progress and the final summary, attribute only the files *this run* changed, and
+list any pre-existing dirty files separately — so the user never mistakes their own
+in-flight edits for the pipeline's output. Never `git add`/`commit`/`push` as part
+of this; it's a read-only snapshot.
+
 ## Task folders (the unit of work)
 
 Each backlog item in flight gets its own folder under `docs/active/tasks/`

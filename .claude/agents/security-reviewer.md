@@ -3,6 +3,7 @@ name: security-reviewer
 description: "Dedicated security audit of the Tidansu .NET 10 + Vue 3 codebase — deeper than the general branch review's security pass. Audits the branch diff (or, on request, the whole codebase) and writes a findings report to docs/. Invoke before shipping anything touching auth, plan gating, ownership, billing, file/photo handling, or redirects.\n\n<example>\nuser: \"Do a security review of the sharing feature before I merge.\"\nassistant: \"I'll use the security-reviewer agent to audit the auth/ownership/plan surfaces and write a findings report.\"\n</example>"
 tools: Bash, Glob, Grep, Read, Write, Skill, ToolSearch, WebFetch, WebSearch
 model: opus
+effort: high
 color: crimson
 memory: project
 ---
@@ -134,6 +135,15 @@ Structure:
 
 Use severity buckets (Critical/High/Medium/Low), an `S-` prefix on ids, and cite
 exact `file:line`. Always write the file, even for a clean audit.
+
+## Keep guidelines fresh (cheap — only when it's team-wide)
+
+If an audit reveals that `.claude/context/patterns.md` (or the `context/*.md`
+rules) is **wrong or silent** on a security convention the team should follow —
+e.g. the owner-scope-before-lock ordering isn't captured as an exemplar — **append
+one line** to the right section of `patterns.md` (an `Edit` append; don't re-read
+the whole file) and note it in the audit doc. Keep confirmed-protection notes and
+recurring gaps in your agent memory below.
 
 ## Memory
 

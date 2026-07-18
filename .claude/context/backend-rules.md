@@ -1,5 +1,12 @@
 # Backend Rules
 
+> **Grounding:** the conventions here are correct, but some inline examples use
+> stale SelfGrind names (`CreateTaskCommand`, `TaskItem`, `TasksController`). The
+> real domain is **Space → Zone → Item**. For current files to copy — and the
+> three-invariant mutating-handler pattern (owner-scope → plan-gate → atomic cap) —
+> see **`.claude/context/patterns.md`**. The canonical command triplet lives at
+> `Tidansu.Application/Spaces/Commands/AddZone/`.
+
 ## CQRS Conventions
 
 ### Commands
@@ -101,7 +108,13 @@ Validation errors throw `Tidansu.Domain.Exceptions.ValidationException` and are 
 
 ---
 
-## AutoMapper
+## DTO mapping
+
+> **The Spaces feature maps by hand, not with AutoMapper** — DTOs carry static
+> `FromEntity(entity)` + instance `ToEntity(...)` methods (see
+> `Spaces/Dtos/ZoneDto.cs`, used in `AddZoneCommandHandler`). Prefer this for new
+> Spaces code. AutoMapper is still available/registered for features that use it;
+> match the feature you are working in. The AutoMapper shape is below.
 
 Define profiles in `Application/{Feature}/Dtos/{Feature}Profile.cs`:
 
@@ -131,11 +144,11 @@ AutoMapper is registered automatically by scanning the Application assembly.
 
 ### Interface (Domain layer — no EF/DB references)
 ```csharp
-// Tidansu.Domain/Interfaces/Repositories/ITasksRepository.cs
-public interface ITasksRepository
+// Tidansu.Domain/Repositories/ISpacesRepository.cs  (namespace Tidansu.Domain.Repositories)
+public interface ISpacesRepository
 {
-    Task<Guid> Create(TaskItem taskItem);
-    Task<TaskItem?> GetById(Guid id);
+    Task<Guid> Create(Space space);
+    Task<Space?> GetById(Guid id, string userId);   // owner-scoped
 }
 ```
 

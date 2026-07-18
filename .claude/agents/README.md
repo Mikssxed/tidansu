@@ -66,31 +66,78 @@ All paths below are inside the task folder `docs/active/tasks/<id>-<slug>/`.
 `/build-feature` (in `.claude/commands/`) is the orchestrator — it's a slash
 command, not an agent, because subagents can't spawn other subagents.
 
-## Model tiers (cost/effectiveness tuning)
+## Model + effort tiers (cost/effectiveness tuning)
 
-Not every stage needs Opus. We keep Opus only where deep reasoning changes the
-outcome **and** a mistake is expensive or hard to catch downstream; the rest run on
-Sonnet, protected by objective gates.
+Cost is tuned on **two** axes, both set per-agent in frontmatter: **model** (the
+tier — Opus ≈ 5×/25×, Sonnet ≈ 3×/15×, Haiku ≈ 1×/5× per Mtok) and **effort** (the
+reasoning/thinking-token budget — `low|medium|high|xhigh|max`). We keep Opus **and**
+high effort only where deep reasoning changes the outcome *and* a mistake is
+expensive or hard to catch downstream; everything gated by an objective check runs
+Sonnet at medium.
 
-| Agent | Model | Rationale |
-|---|---|---|
-| `tech-lead` | **opus** | Highest-leverage stage — a bad plan multiplies cost across every downstream dispatch. |
-| `branch-code-reviewer` | **opus** | Subtle-bug hunting; false negatives are invisible and costly. |
-| `security-reviewer` | **opus** | High-stakes (IDOR, plan-bypass, billing) with no mechanical safety net. |
-| `feature-developer` | **sonnet** | Highest-volume agent (per-task cold starts + drives the app), but tightly scoped with hard gates (`dotnet build`, `vue-tsc`, drive-the-app) that catch errors mechanically. |
-| `design-ui-engineer` | **sonnet** | Component codegen against strict, well-specified rules with a `vue-tsc` gate. |
-| `pm-requirements-analyst` | **sonnet** | Structured business-language writing into a fixed template; no code reasoning. |
+> **Pin both — subagents inherit the session effort by default.** A subagent's
+> `effort:` frontmatter overrides the session's `effortLevel`. So the review/plan
+> agents pin `effort: high` explicitly to stay strong even when the session default
+> is lower, and the gated agents pin `medium` to save tokens. Don't rely on the
+> session default to keep a reviewer sharp.
 
-Rule of thumb when adding an agent: **Sonnet if an objective gate verifies its
-output; Opus if nothing downstream mechanically catches a weak result.** Don't drop
-reasoning-only stages (requirements/planning/review) to Haiku — they have no safety
-net.
+| Agent | Model | Effort | Rationale |
+|---|---|---|---|
+| `tech-lead` | **opus** | **high** | Highest-leverage stage — a bad plan multiplies cost across every downstream dispatch. |
+| `branch-code-reviewer` | **opus** | **high** | Subtle-bug hunting; false negatives are invisible and costly. |
+| `security-reviewer` | **opus** | **high** | High-stakes (IDOR, plan-bypass, billing) with no mechanical safety net. |
+| `feature-developer` | **sonnet** | **high** | Highest-volume agent (per-task cold starts + drives the app). Kept at `high` despite the hard gates (`dotnet build`, `vue-tsc`, drive-the-app) — the implementation *is* the product, so weak code is costlier than the extra thinking tokens. Sonnet keeps the tier cheap; effort stays high for correctness. |
+| `design-ui-engineer` | **sonnet** | **medium** | Component codegen against strict, well-specified rules with a `vue-tsc` gate. |
+| `pm-requirements-analyst` | **sonnet** | **medium** | Structured business-language writing into a fixed template; no code reasoning. |
+
+**Session default:** `.claude/settings.json` sets `effortLevel: medium` — this governs
+only the **orchestrator / main thread** (`/build-feature` coordination and ad-hoc
+work), since every agent above pins its own effort. Coordination is dispatch +
+summarize + gate, so it doesn't need `high`. Bump a single session with `/effort high`
+when you're doing heavy main-thread reasoning yourself.
+
+Rule of thumb when adding an agent: pick the **cheapest model** whose output a gate
+can verify (Sonnet when a build/type-check/drive catches errors, Opus when nothing
+downstream does); pick **effort by how costly a weak result is** — `medium` for
+structured/gated writing, `high` when the output is shipped product or a missed flaw
+is expensive (that's why `feature-developer` stays gated **and** high).
+Reserve `xhigh`/`max` for a stage where correctness genuinely beats cost, and don't
+drop reasoning-only stages (requirements/planning/review) to Haiku or `low` — they
+have no safety net. **Don't pin older within-tier model versions to save money** —
+Opus 4.7/4.6 cost the same as 4.8, and Sonnet 4.6 currently costs *more* than Sonnet
+5's intro pricing; the levers are tier and effort, not version.
+
+## Guideline docs (what agents plan/build against)
+
+`.claude/context/` holds the shared engineering guidelines:
+
+- **`patterns.md`** — the **canonical-exemplars index**: for each kind of task, the
+  real file to copy (a command → `Spaces/Commands/AddZone/`; a data composable →
+  `useSpacesApi.ts`) plus the three mutating-handler invariants (owner-scope →
+  plan-gate → atomic cap). This is the first stop for tech-lead and feature-developer
+  and the cheapest way to cold-start correctly. **Grounded in real files**, so it
+  stays accurate as code evolves.
+- `architecture.md` · `backend-rules.md` · `frontend-rules.md` — conventions in
+  prose. Their *principles* are correct; some older *example names* are stale
+  SelfGrind text (`Task`/`Quest`), so each carries a grounding banner pointing at
+  `patterns.md`. **Ignore `project-overview.md`** entirely (stale SelfGrind).
+
+### Living guidelines (cheap self-update)
+
+Agents keep the shared guidelines fresh **without a token-heavy pass**: when an
+agent hits a durable, team-wide convention that `patterns.md` (or a `context/*.md`
+rule) gets **wrong or omits**, it **appends one line** to the right section of
+`patterns.md` — an `Edit` append, not a re-read/rewrite — and flags it in its
+return summary or stage file. Task-specific or agent-specific gotchas stay in
+private **agent memory** instead. Each agent (`feature-developer`, `tech-lead`,
+`branch-code-reviewer`, `design-ui-engineer`, `security-reviewer`) carries a short
+"Keep guidelines fresh" block enforcing this split.
 
 ## Conventions baked into every agent
 
 - **Domain = spatial inventory** (spaces → zones → items, expiry). *Ignore
   `.claude/context/project-overview.md`* — it's a stale SelfGrind task/XP leftover;
-  `CLAUDE.md` is authoritative.
+  `CLAUDE.md` is authoritative. Copy real shapes from `.claude/context/patterns.md`.
 - **Plan limits are core logic:** check the cap **before** every mutation; on cap
   throw `PlanLimitException` with the right `reason` (`spaces | zones | items |
   photos | sync`); the frontend opens the paywall on a 403 `{plan:[reason]}`;

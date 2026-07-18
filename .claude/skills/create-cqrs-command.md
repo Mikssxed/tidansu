@@ -2,6 +2,17 @@
 
 Use this for any operation that **modifies state** (create, update, delete, process).
 
+> **Grounding:** the real command triplet to copy is
+> `Tidansu.Application/Spaces/Commands/AddZone/` (see `.claude/context/patterns.md`).
+> The generic template below shows the *shape*; `AddZoneCommandHandler` shows the
+> **required Tidansu invariants this template omits** — in a mutating handler:
+> **(1)** resolve the user (`IUserContext` → `IUserService.FindByIdAsync`) and do an
+> **owner-scoped** lookup that `throw new NotFoundException(...)` for an unknown or
+> other-user id **before any other work**; **(2) plan-gate before the mutation**
+> (`if (PlanPolicy.CheckX(user.Plan, …) is { } reason) throw new PlanLimitException(reason);`);
+> **(3)** for finite (Free) caps, enforce the cap **atomically** in the repo. Spaces
+> DTOs map via static `FromEntity`/`ToEntity`, **not** AutoMapper.
+
 ---
 
 ## File Structure
@@ -14,11 +25,11 @@ Create three files in `Tidansu.Application/{Feature}/Commands/{ActionName}/`:
 {ActionName}CommandValidator.cs
 ```
 
-Example feature=`Tasks`, ActionName=`CreateTask`:
+Example feature=`Spaces`, ActionName=`AddZone`:
 ```
-Tidansu.Application/Tasks/Commands/CreateTask/CreateTaskCommand.cs
-Tidansu.Application/Tasks/Commands/CreateTask/CreateTaskCommandHandler.cs
-Tidansu.Application/Tasks/Commands/CreateTask/CreateTaskCommandValidator.cs
+Tidansu.Application/Spaces/Commands/AddZone/AddZoneCommand.cs
+Tidansu.Application/Spaces/Commands/AddZone/AddZoneCommandHandler.cs
+Tidansu.Application/Spaces/Commands/AddZone/AddZoneCommandValidator.cs
 ```
 
 ---
@@ -55,7 +66,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using Tidansu.Application.User;
 using Tidansu.Domain.Entities;
-using Tidansu.Domain.Interfaces.Repositories;
+using Tidansu.Domain.Repositories;   // repository interfaces live in Domain/Repositories/
 
 namespace Tidansu.Application.{Feature}.Commands.{ActionName};
 

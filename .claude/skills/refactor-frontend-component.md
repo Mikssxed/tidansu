@@ -2,6 +2,11 @@
 
 Use this to improve existing Vue components: extract logic, split into smaller components, enforce conventions.
 
+> **Grounding:** target the **real `@theme` tokens** (`surface-2`, `text-2`,
+> `border`, `warn`, `danger`, `ok`, `pro`, `pri-bg`/`pri-fg`, `zone-*`) — the
+> `info-500` / `success-500` / `primary-900` tokens in older examples don't exist.
+> Mirror `BaseBadge.vue` / `BaseButton.vue`. See `.claude/context/patterns.md`.
+
 ---
 
 ## Common Refactoring Scenarios
@@ -13,7 +18,7 @@ Use this to improve existing Vue components: extract logic, split into smaller c
 <div style="background: rgba(59, 130, 246, 0.3)">
 
 <!-- After -->
-<div class="bg-info-500/30">
+<div class="bg-warn/15">
 ```
 
 If the color doesn't exist as a theme token, add it to `style.css` under `@theme` first.
@@ -31,16 +36,16 @@ interface Props {
 
 **After:**
 ```typescript
-export type CardVariant = 'info' | 'success' | 'warning';
+export type CardVariant = 'neutral' | 'warn' | 'ok';
 
 interface Props {
     variant: CardVariant;
 }
 
 const bgClasses: Record<CardVariant, string> = {
-    info: 'bg-info-500/30',
-    success: 'bg-success-500/30',
-    warning: 'bg-warning-500/30',
+    neutral: 'bg-surface-2',
+    warn: 'bg-warn/15',
+    ok: 'bg-ok/15',
 };
 ```
 
@@ -52,10 +57,10 @@ const bgClasses: Record<CardVariant, string> = {
 // Before — doesn't work with Tailwind v4
 const cls = `bg-${props.color}-500`;
 
-// After — static strings
+// After — static strings, real tokens
 const colorMap: Record<Variant, string> = {
-    info: 'bg-info-500',
-    error: 'bg-error-500',
+    warn: 'bg-warn',
+    danger: 'bg-danger',
 };
 ```
 
@@ -108,12 +113,12 @@ Each extracted component:
 const handleSubmit = async (data: any) => { ... };
 
 // After
-interface FormData {
-    title: string;
-    description: string;
-    exp: number;
+interface ItemFormData {
+    name: string;
+    quantity: number;
+    expiresOn: string | null;
 }
-const handleSubmit = async (data: FormData) => { ... };
+const handleSubmit = async (data: ItemFormData) => { ... };
 ```
 
 ---

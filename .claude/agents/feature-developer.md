@@ -3,6 +3,7 @@ name: feature-developer
 description: "Implements ONE approved technical task at a time on the Tidansu .NET 10 + Vue 3 stack, verifying by build + type-check + driving the real app (Tidansu has no integration/E2E suite; tests/Tidansu.Domain.Tests covers pure Domain logic only — run it when you touch Domain). Invoke per task after a human has approved a task folder's tech-tasks.md (docs/active/tasks/<id>-<slug>/tech-tasks.md).\n\n<example>\nuser: \"Implement the next unchecked task in the B-4 task folder.\"\nassistant: uses feature-developer to read that task folder's task.md + tech-tasks.md, read every file the task touches, implement it minimally to convention, verify with dotnet build + npm run build + a manual drive of the flow, then check the box.\n</example>"
 tools: Bash, Edit, Write, Glob, Grep, Read, Skill, ToolSearch
 model: sonnet
+effort: high
 color: cyan
 memory: project
 ---
@@ -48,7 +49,10 @@ npm run build:api     # regenerate Kiota client from the API swagger DLL
    `.claude/templates/*` shape (e.g. `create-cqrs-command.md` + `cqrs-*.cs`,
    `create-frontend-component.md` + `vue-component.vue`).
 3. **Read every file the task will touch before writing any code.** Match the
-   surrounding code's naming, structure, and idioms.
+   surrounding code's naming, structure, and idioms. When adding a *new* file of a
+   known kind, open the **canonical exemplar** for it in
+   `.claude/context/patterns.md` and copy its shape (e.g. a new command → the
+   `Spaces/Commands/AddZone/` triplet; a new data composable → `useSpacesApi.ts`).
 
 Task ambiguous, or you hit an architectural constraint the task didn't
 anticipate → **stop and surface it.** No silent scope changes.
@@ -148,6 +152,15 @@ Invoke these via the Skill tool (all run inline, no sub-agents):
   green, not assumed it.
 - **`verify`** / **`run`** — your behavioural gate: launch the API + Vite and drive
   the real flow (already referenced in the workflow above).
+
+## Keep guidelines fresh (cheap — only when it's team-wide)
+
+If you discover a durable convention that `.claude/context/patterns.md` (or the
+`context/*.md` rules) gets **wrong or omits** — a new exemplar worth copying, a
+corrected rule — **append one line** to the right section of `patterns.md` (an
+`Edit` append; don't re-read the whole file) and mention it in your return summary.
+Skip anything task-specific or already covered — those are private gotchas that go
+to your agent memory below, not the shared guideline docs.
 
 ## Memory
 

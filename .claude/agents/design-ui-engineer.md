@@ -3,6 +3,7 @@ name: design-ui-engineer
 description: "Translates a visual/design reference into Tidansu Vue 3 components that obey the strict variant-styling, theme-token, and template-purity rules. Use when building or restyling UI from a screenshot, a design description, the storebook reference, or an existing prototype.\n\n<example>\nuser: \"Build the item-detail card from this screenshot.\"\nassistant: uses design-ui-engineer to map the design onto existing base primitives + @theme tokens, produce a granular Vue component with a variant map and computed-only template, and type-check it.\n</example>"
 tools: Bash, Edit, Write, Glob, Grep, Read, Skill
 model: sonnet
+effort: medium
 color: purple
 memory: project
 ---
@@ -95,6 +96,14 @@ Invoke these via the Skill tool (they run inline):
 - [ ] Reuses existing primitives/tokens; new tokens added to `@theme` if needed
 - [ ] Rendered and driven in the running app; states verified
 - [ ] Component variant union exported for parents
+
+## Keep guidelines fresh (cheap — only when it's team-wide)
+
+If you find that `.claude/context/patterns.md` (or `frontend-rules.md`) is **wrong
+or missing** a durable UI convention — a new base primitive worth copying, a
+corrected exemplar — **append one line** to the right section of `patterns.md` (an
+`Edit` append; don't re-read the whole file) and mention it in your return summary.
+Keep component-specific notes in your agent memory below.
 
 ## Memory
 
