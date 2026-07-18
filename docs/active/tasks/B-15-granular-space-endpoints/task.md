@@ -2,7 +2,7 @@
 id: B-15
 slug: granular-space-endpoints
 title: Granular item/zone endpoints instead of delete-all/re-insert on every save
-status: in-review      # draft → requirements → tech-planning → in-progress → in-review → done | blocked
+status: done           # draft → requirements → tech-planning → in-progress → in-review → done | blocked
 depends-on: []         # B-12's cap lock and B-13's SpacePhotoGuard already landed (bf9e169)
 touch-points:
   - src/Tidansu.API/Controllers/SpacesController.cs

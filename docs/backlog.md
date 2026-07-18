@@ -268,15 +268,25 @@ items, or photos; add a counts-only repository method.
 _Touch points:_ `src/Tidansu.Application/Account/Queries/GetAccount/`, `SpacesRepository.cs`,
 `UsageDto.cs`.
 
-### [B-15] Diff-based space update instead of delete-all/re-insert on every save (SC-2)
+### [B-15] Granular item/zone endpoints instead of delete-all/re-insert on every save (SC-2)
 **Priority**: P3
-**Status**: unprocessed
-From the B-8 audit (🟠 SC-2). `SpacesRepository.ReplaceAsync` deletes and re-inserts all zones
-and items on every debounced whole-space PUT, so renaming one item in a 50-item space issues
-~100 DELETE + ~100 INSERT and rewrites every item's photo blob instead of a single-row UPDATE
-— heavy write amplification and index churn under load. Diff the incoming set against the
-existing rows and apply per-entity add/update/remove (match on id), or move to granular
-item/zone endpoints. Design change.
+**Status**: ✅ done (2026-07-16 — built, both-reviewer'd & hardened; merged as PR #2 `cddb15b`;
+see `docs/active/tasks/B-15-granular-space-endpoints/`. The backlog offered two routes; the user
+chose the heavier one at kickoff: **granular per-entity endpoints**, not a diff inside
+`ReplaceAsync`. `PUT /api/spaces/{id}` and `ReplaceAsync` are **retired**, replaced by
+`SpaceZonesController` + `SpaceItemsController` and a scalar-only `PUT /api/spaces/{id}/fields`.
+The plan gate decomposed by algebra — for an add `after = before + 1`, so the old
+`after > cap ∧ after > before` reduces exactly to `before >= cap`; updates/deletes change no
+count and so get **no gate call at all**, and that absence *is* the downgrade-stays-editable
+rule. FR-9's per-space add race is closed with B-12's `sp_getapplock` pattern, keyed per-space,
+one resource for zones+items, Free-only. **No EF migration** — a checked conclusion (D-5), not
+an omission. Review fixed a 🔴 zone-delete/item-op ordering race (silent data loss) + 4 🟠;
+the client-supplied-PK DoS was checked for attribution, found **pre-existing**, and split out
+as **B-22**.)
+From the B-8 audit (🟠 SC-2). `SpacesRepository.ReplaceAsync` deleted and re-inserted all zones
+and items on every debounced whole-space PUT, so renaming one item in a 50-item space issued
+~100 DELETE + ~100 INSERT and rewrote every item's photo blob instead of a single-row UPDATE
+— heavy write amplification and index churn under load. Design change.
 _Touch points:_ `src/Tidansu.Infrastructure/Repositories/SpacesRepository.cs`,
 `UpdateSpaceCommandHandler.cs`, possibly the frontend save path.
 
