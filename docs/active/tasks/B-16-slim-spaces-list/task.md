@@ -2,7 +2,7 @@
 id: B-16
 slug: slim-spaces-list
 title: Paginate/slim the spaces list; stop returning photo data-URLs inline (SC-3)
-status: in-review   # draft → requirements → tech-planning → in-progress → in-review → done | blocked
+status: done   # draft → requirements → tech-planning → in-progress → in-review → done | blocked
 depends-on: []         # B-13, B-14, B-15 have all landed; their conclusions are inherited below
 touch-points:
   - src/Tidansu.Application/Spaces/Queries/GetSpaces/GetSpacesQueryHandler.cs
@@ -120,18 +120,18 @@ it" is a hard acceptance criterion — and it must be **proven by driving**, not
       the DB). See the TRAP note below; this is the single highest-risk regression here.
 - [x] Boot payload for the agreed heavy-account benchmark is bounded and small — **measured**
       before/after, not assumed.
-- [ ] The client no longer eagerly loads every space's full contents on boot (per-space
-      lazy-load), and the dashboard still renders correctly. **Lazy-load mechanism proven at
-      the API level** (GET /{id} is the only path that returns zones/items; the list never
-      does); **"the dashboard still renders correctly" not visually driven** — no browser
-      tooling available this pass.
-- [ ] The space list itself is paginated (FR-9) and the dashboard renders correctly across
-      the page boundary. **Pagination mechanism proven** (deterministic, disjoint,
-      correct `totalCount`, correct clamp/400s); **"the dashboard renders correctly" not
-      visually driven** — no browser tooling available this pass.
-- [ ] A "still loading" state for a space's contents is visibly distinct from the genuine
-      empty state — a loading space must never look like an empty one (cf. B-18's bug). Purely
-      a UI/visual criterion — **not driven**, no browser tooling available this pass.
+- [x] The client no longer eagerly loads every space's full contents on boot (per-space
+      lazy-load), and the dashboard still renders correctly. Mechanism proven at the API level
+      (GET /{id} is the only path returning zones/items) **and driven in Chrome (2026-07-19)** —
+      dashboard cards render with summary-driven counts, no space's contents loaded on boot.
+- [x] The space list itself is paginated (FR-9) and the dashboard renders correctly across
+      the page boundary. Mechanism proven (deterministic, disjoint, correct `totalCount`, clamp
+      400s) **and driven in Chrome** — page 1 = 20 cards + "Load more", page 2 appends correctly,
+      and a page-2 deep-link loads directly (M1 fix).
+- [x] A "still loading" state for a space's contents is visibly distinct from the genuine
+      empty state — a loading space must never look like an empty one (cf. B-18's bug). **Driven
+      in Chrome** — a distinct centred "Loading…" placeholder shows, then resolves to content;
+      never mistakable for the empty state.
 - [x] Free/Pro plan gating is unchanged: no plan-cap path
       (`spaces`/`zones`/`items`/`photos`/`sync`) regresses. In particular the `photos` gate
       on item create/update still fires exactly as today.

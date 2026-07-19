@@ -292,7 +292,11 @@ _Touch points:_ `src/Tidansu.Infrastructure/Repositories/SpacesRepository.cs`,
 
 ### [B-16] Paginate/slim the spaces list; stop returning photo data-URLs inline (SC-3)
 **Priority**: P3
-**Status**: unprocessed
+**Status**: done — shipped (commits bfa979b + b002069). Payload fix only per the third scope
+decision; photo upload/display/serving split to B-1. Read path now serves a paginated,
+photo-less summary + a photo-less full graph; `GET /api/spaces` measured 120,418,315 → 968 bytes.
+Driven-verified (FR-1 SQL-proven, FR-3 DB-proven, FR-6/M1 in-browser). See
+`docs/active/tasks/B-16-slim-spaces-list/`.
 From the B-8 audit (🟠 SC-3). `GET /api/spaces` returns every space, zone and item with each
 `Photo` base64 inline and no paging, all eagerly loaded on app boot. A heavy Pro account
 returns a tens-of-MB response that grows unbounded. Two tracks: (a) don't ship photo blobs in
