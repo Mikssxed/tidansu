@@ -17,10 +17,15 @@
             <div class="min-w-0 flex-1">
                 <h3 class="truncate text-[16px] font-bold text-text">{{ space.name }}</h3>
                 <p class="text-[13px] text-text-3">{{ typeDef.title }}</p>
+                <SpaceReadonlyBadge
+                    v-if="readOnly"
+                    class="mt-1.5"
+                />
             </div>
             <div @click.stop>
                 <BasePopoverMenu label="Space actions">
                     <BasePopoverMenuItem
+                        v-if="!readOnly"
                         icon="edit"
                         @click="onRename"
                     >
@@ -78,12 +83,16 @@
     import { spaceTypeDef } from '@/data/spaces';
     import type { Space } from '@/data/types';
     import { computed } from 'vue';
+    import SpaceReadonlyBadge from './SpaceReadonlyBadge.vue';
 
     interface SpaceCardProps {
         space: Space;
+        readOnly?: boolean;
     }
 
-    const props = defineProps<SpaceCardProps>();
+    const props = withDefaults(defineProps<SpaceCardProps>(), {
+        readOnly: false,
+    });
 
     const emit = defineEmits<{
         open: [id: string];

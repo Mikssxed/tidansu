@@ -13,3 +13,4 @@
 - [Optimistic rollback review checks](optimistic-rollback-review-checks.md) — two silent-data-loss shapes in the store flush: snapshot Object.assign stomping child arrays; cascade delete racing reassignment updates
 - [Empty fixtures hide rollback bugs](empty-fixtures-hide-rollback-bugs.md) — a green test over `zones: []`/`items: []` proves nothing about code that copies those arrays; read the fixture builder
 - [Lazy-list / pagination regression checks](lazy-list-pagination-regression-checks.md) — deep-link reachability + client-side aggregates over now-empty items/zones arrays are the two off-diff regressions of a slim-list slice
+- [Two item-remove entry points](two-item-remove-entry-points.md) — SpaceView list view removes items via BOTH ItemDetailModal AND ItemRow "×"; gating tasks hide one and miss the other

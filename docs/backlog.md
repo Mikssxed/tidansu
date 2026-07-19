@@ -322,7 +322,7 @@ _Touch points:_ `GetSpacesQueryHandler.cs`, `SpacesRepository.cs`, DTOs, `App.vu
 
 ### [B-17] Reflect read-only over-cap spaces after downgrade in the UI (U-1)
 **Priority**: P2
-**Status**: unprocessed
+**Status**: done
 From the B-8 audit (🟠 U-1). The product rule and the app's own FAQ (`PricingView`) promise that
 after a downgrade, spaces/items beyond the Free limits become read-only — but nothing in the SPA
 enforces it. Guards only block *adding* past a cap, so a Pro user who drops to Free keeps all
@@ -435,6 +435,23 @@ ever wanted, that's a much larger piece of work — this item is just about maki
 language on purpose instead of by accident.
 _Touch points:_ `src/Tidansu.API/Program.cs` (culture config), possibly `Tidansu.API.csproj`
 (`InvariantGlobalization`); verify by driving a validation failure and checking the message language.
+
+### [B-23] Server-side enforcement of read-only over-cap content after downgrade
+**Priority**: P2
+**Status**: unprocessed
+Follow-up carved out of B-17. B-17 makes over-cap spaces read-only **in the SPA only** — it disables
+the mutating affordances and badges the spaces, but the API still accepts the mutations. A downgraded
+(Free) user holding a valid JWT can therefore still rename, add zones/items to, or otherwise mutate a
+space beyond `caps.spaces` by calling the endpoints directly, bypassing the UI. This is the
+server-side half of the product rule "downgrade keeps data but makes over-cap content read-only":
+the mutate handlers (space update, zone/item create/update) must reject writes to over-cap spaces
+for a Free-plan user with the same deterministic over-cap selection the SPA uses (spaces beyond
+`caps.spaces` by stable `OrderBy(s => s.Id)` order), returning a plan-limit error the SPA already
+knows how to surface. Delete must stay allowed (it's the recovery path back under the cap). Until
+this lands, B-17 is UX honesty only, not a real access control.
+_Touch points:_ `Tidansu.Application` mutate handlers (space update, zone/item create/update) +
+their validators/authorization; the plan-cap/ownership check already used for adds; `Tidansu.Domain`
+plan constants.
 
 ---
 

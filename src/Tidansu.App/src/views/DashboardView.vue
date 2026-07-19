@@ -71,9 +71,10 @@
             class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
             <SpaceCard
-                v-for="space in store.spaces"
-                :key="space.id"
-                :space="space"
+                v-for="card in spaceCards"
+                :key="card.space.id"
+                :space="card.space"
+                :read-only="card.readOnly"
                 @open="openSpace"
                 @rename="onRename"
                 @duplicate="onDuplicate"
@@ -155,6 +156,12 @@
     const atSpaceLimit = computed(
         () => !isInf(session.caps.spaces) && store.count >= session.caps.spaces
     );
+
+    // Fully-mapped v-for source (template-purity HARD RULE) — each card already
+    // carries its own read-only flag, so the template never calls isSpaceReadOnly.
+    const spaceCards = computed(() =>
+        store.spaces.map((space) => ({ space, readOnly: limits.isSpaceReadOnly(space.id) }))
+    );
     const newTileIcon = computed(() => (atSpaceLimit.value ? 'lock' : 'plus'));
     const newTileTitle = computed(() =>
         atSpaceLimit.value ? 'Upgrade for more spaces' : 'New space'
@@ -188,6 +195,9 @@
     }
 
     function onRename(id: string) {
+        // B-17 backstop: never open the rename modal for an over-cap space, even
+        // if SpaceCard's disabled state (T4) is somehow bypassed.
+        if (limits.isSpaceReadOnly(id)) return;
         renameTarget.value = store.getById(id);
     }
 

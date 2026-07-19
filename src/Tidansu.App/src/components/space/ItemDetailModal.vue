@@ -30,7 +30,10 @@
                 </div>
             </div>
 
-            <div class="mt-4 flex gap-2">
+            <div
+                v-if="canEdit"
+                class="mt-4 flex gap-2"
+            >
                 <BaseButton
                     variant="secondary"
                     size="sm"
@@ -127,9 +130,11 @@
         zone: Zone | null;
         type: SpaceTypeId;
         canPhoto: boolean;
+        /** B-17: false on a read-only (over-cap) space — hides Edit/Remove, viewing stays. */
+        canEdit?: boolean;
     }
 
-    const props = defineProps<Props>();
+    const props = withDefaults(defineProps<Props>(), { canEdit: true });
     const emit = defineEmits<{
         close: [];
         edit: [id: string];

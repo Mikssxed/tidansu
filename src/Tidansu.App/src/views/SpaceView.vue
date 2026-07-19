@@ -7,6 +7,14 @@
             @set-view="onSetView"
         />
 
+        <!-- B-17: over-cap space after a downgrade — content can't be changed. -->
+        <div
+            v-if="readOnly"
+            class="mt-4"
+        >
+            <SpaceReadonlyBadge />
+        </div>
+
         <!-- Contents still loading (B-16 FR-5) — must never be mistaken for the empty state -->
         <div
             v-if="isLoadingContents"
@@ -41,7 +49,10 @@
         <template v-else-if="space">
             <!-- List view -->
             <div v-if="viewMode === 'list'">
-                <div class="mt-6">
+                <div
+                    v-if="!readOnly"
+                    class="mt-6"
+                >
                     <SmartAdd
                         :last-zone-name="lastZoneName"
                         @add="onAdd"
@@ -50,6 +61,7 @@
 
                 <ItemList
                     :space="space"
+                    :read-only="readOnly"
                     @select="onSelect"
                     @remove="onRemove"
                 />
@@ -82,6 +94,7 @@
                     v-else
                     :space="space"
                     :selected-id="selectedId"
+                    :read-only="readOnly"
                     @select="onSelect"
                     @add="onLayoutAdd"
                     @edit="startEditing"
@@ -96,6 +109,7 @@
             :zone="selectedZone"
             :type="space.type"
             :can-photo="session.isPro"
+            :can-edit="!readOnly"
             @close="closeDetail"
             @edit="onEditItem"
             @remove="onRemove"
@@ -124,6 +138,7 @@
     import SeeAsLayoutPromo from '@/components/space/SeeAsLayoutPromo.vue';
     import SmartAdd from '@/components/space/SmartAdd.vue';
     import SpaceHeader from '@/components/space/SpaceHeader.vue';
+    import SpaceReadonlyBadge from '@/components/spaces/SpaceReadonlyBadge.vue';
     import type { IconName } from '@/components/icons';
     import { useLimits } from '@/composables/useLimits';
     import { zoneName } from '@/data/spaces';
@@ -141,6 +156,9 @@
     const router = useRouter();
 
     const space = computed(() => store.getById(props.id));
+    // B-17: live over-cap flag — never a snapshot, re-derives on downgrade/upgrade/
+    // add/delete via `limits.readonlySpaceIds`.
+    const readOnly = computed(() => limits.isSpaceReadOnly(props.id));
     const viewMode = computed<ViewMode>(() => space.value?.viewMode ?? 'list');
     // B-16 FR-5: a space's contents load lazily on open — this must render as an
     // explicit loading state, distinct from the genuine "no zones yet" empty state
@@ -223,12 +241,14 @@
     });
 
     function onAdd(raw: string) {
+        if (readOnly.value) return;
         if (!space.value) return;
         if (!limits.guard(limits.checkAddItem(space.value))) return;
         const item = store.addItemSmart(space.value.id, raw);
         if (item) lastZoneId.value = item.zoneId;
     }
     function onRemove(id: string) {
+        if (readOnly.value) return;
         if (space.value) store.removeItem(space.value.id, id);
         if (selectedId.value === id) selectedId.value = null;
     }
@@ -258,6 +278,7 @@
 
     // ---- layout view + editor ----
     function startEditing() {
+        if (readOnly.value) return;
         editing.value = true;
     }
     function stopEditing() {
@@ -267,6 +288,7 @@
         addTarget.value = payload;
     }
     function onEditItem(id: string) {
+        if (readOnly.value) return;
         selectedId.value = null; // close the detail so the form sits cleanly on top
         editId.value = id;
     }
@@ -297,6 +319,10 @@
         // Add new item into the targeted zone/slot.
         const target = addTarget.value;
         if (!target) return;
+        if (readOnly.value) {
+            addTarget.value = null;
+            return;
+        }
         if (!limits.guard(limits.checkAddItem(space.value))) {
             addTarget.value = null;
             return;
@@ -317,22 +343,27 @@
         addTarget.value = null;
     }
     function onAddColumnZone(column: number) {
+        if (readOnly.value) return;
         if (!space.value) return;
         if (!limits.guard(limits.checkAddZone(space.value))) return;
         store.addZoneColumn(space.value.id, column);
     }
     function onAddFreeZone(rect: Rect, kind: ZoneKind) {
+        if (readOnly.value) return;
         if (!space.value) return;
         if (!limits.guard(limits.checkAddZone(space.value))) return;
         store.addZoneFree(space.value.id, rect, kind);
     }
     function onUpdateZone(id: string, patch: Partial<Zone>) {
+        if (readOnly.value) return;
         if (space.value) store.updateZone(space.value.id, id, patch);
     }
     function onDeleteZone(id: string) {
+        if (readOnly.value) return;
         if (space.value) store.deleteZone(space.value.id, id);
     }
     function onConvert() {
+        if (readOnly.value) return;
         if (space.value) store.convertToFreeform(space.value.id);
     }
 </script>

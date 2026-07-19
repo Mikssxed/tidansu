@@ -31,6 +31,7 @@
                         :zone="zone"
                         :space="space"
                         :selected-id="selectedId"
+                        :read-only="readOnly"
                         @select="onSelect"
                         @add="onAdd"
                     />
@@ -70,7 +71,10 @@
                         :selected-id="selectedId"
                         @select="onSelect"
                     />
-                    <AddChip @add="onAddFloor(floor.id)" />
+                    <AddChip
+                        v-if="!readOnly"
+                        @add="onAddFloor(floor.id)"
+                    />
                 </div>
             </div>
         </div>
@@ -90,9 +94,11 @@
     interface Props {
         space: Space;
         selectedId: string | null;
+        /** B-17: true on an over-cap space — hides every in-slot "+" add chip. */
+        readOnly?: boolean;
     }
 
-    const props = defineProps<Props>();
+    const props = withDefaults(defineProps<Props>(), { readOnly: false });
     const emit = defineEmits<{
         select: [id: string];
         add: [payload: { zoneId: string; depth: ItemDepth; level: number }];

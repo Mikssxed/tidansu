@@ -75,6 +75,7 @@
                 :item="row.item"
                 :zone="row.zone"
                 :type="space.type"
+                :read-only="readOnly"
                 @select="onSelect"
                 @remove="onRemove"
             />
@@ -119,6 +120,7 @@
                         :item="row.item"
                         :zone="row.zone"
                         :type="space.type"
+                        :read-only="readOnly"
                         hide-zone
                         @select="onSelect"
                         @remove="onRemove"
@@ -138,7 +140,9 @@
     import type { Item, Space, Zone } from '@/data/types';
     import { computed, ref } from 'vue';
 
-    const props = defineProps<{ space: Space }>();
+    const props = withDefaults(defineProps<{ space: Space; readOnly?: boolean }>(), {
+        readOnly: false,
+    });
     const emit = defineEmits<{ select: [id: string]; remove: [id: string] }>();
 
     const search = ref('');

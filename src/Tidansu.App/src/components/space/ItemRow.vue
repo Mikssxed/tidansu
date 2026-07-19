@@ -39,6 +39,7 @@
         </div>
         <span class="text-[13px] tabular-nums text-text-2">{{ qtyLabel }}</span>
         <button
+            v-if="!readOnly"
             type="button"
             class="flex size-8 items-center justify-center rounded-ctrl text-text-3 transition-colors hover:bg-surface-2 hover:text-text"
             aria-label="Remove"
@@ -66,9 +67,10 @@
         zone: Zone | null;
         type: SpaceTypeId;
         hideZone?: boolean;
+        readOnly?: boolean;
     }
 
-    const props = withDefaults(defineProps<ItemRowProps>(), { hideZone: false });
+    const props = withDefaults(defineProps<ItemRowProps>(), { hideZone: false, readOnly: false });
     const emit = defineEmits<{ select: [id: string]; remove: [id: string] }>();
 
     const iconName = computed(() => props.item.icon ?? itemIcon(props.item.name));

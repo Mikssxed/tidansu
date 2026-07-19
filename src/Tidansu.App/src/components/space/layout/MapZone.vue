@@ -39,6 +39,7 @@
                         @select="onSelect"
                     />
                     <AddChip
+                        v-if="!readOnly"
                         label=""
                         @add="onAdd(band.depth)"
                     />
@@ -61,9 +62,11 @@
         zone: Zone;
         space: Space;
         selectedId: string | null;
+        /** B-17: true on an over-cap space — hides the in-slot "+" add chip. */
+        readOnly?: boolean;
     }
 
-    const props = defineProps<Props>();
+    const props = withDefaults(defineProps<Props>(), { readOnly: false });
     const emit = defineEmits<{
         select: [id: string];
         add: [payload: { zoneId: string; depth: ItemDepth; level: number }];

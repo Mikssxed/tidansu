@@ -34,6 +34,30 @@ export function useLimits() {
 
     const isPaywallOpen = computed(() => paywallReason.value !== null);
 
+    /**
+     * Ids of spaces beyond the plan's space cap — the same cap as `checkAddSpace`,
+     * evaluated positionally instead of as a count. Empty on Pro (unbounded cap).
+     *
+     * ⚠️ Determinism (the crux of B-17): slices `spaces.spaces` **as-is** — the
+     * store's existing order, which mirrors the server's stable `GetSpaces`
+     * ordering (`OrderBy(s => s.Id)`). Never re-sort here and never key off
+     * creation time or local mutation order, or a different set of spaces would
+     * become "the read-only ones" on every render — worse than not flagging at all.
+     * A live `computed` over `session.caps` + `spaces.spaces` (both reactive) —
+     * downgrade, upgrade, space add and space delete all re-derive it immediately,
+     * with no snapshot and no separate "unlock" step.
+     */
+    const readonlySpaceIds = computed<Set<string>>(() => {
+        const cap = session.caps.spaces;
+        if (isInf(cap)) return new Set();
+        return new Set(spaces.spaces.slice(cap).map((s) => s.id));
+    });
+
+    /** Whether a space is read-only because it sits beyond the plan's space cap. */
+    function isSpaceReadOnly(id: string): boolean {
+        return readonlySpaceIds.value.has(id);
+    }
+
     // ---- pre-mutate checks: return the blocking reason, or null when allowed ----
 
     /** Block a new/duplicated space once the plan's space cap is reached. */
@@ -82,6 +106,8 @@ export function useLimits() {
         isPaywallOpen,
         openPaywall,
         closePaywall,
+        readonlySpaceIds,
+        isSpaceReadOnly,
         checkAddSpace,
         checkAddZone,
         checkAddItem,
