@@ -16,6 +16,7 @@ export interface FieldsRequestBuilder extends BaseRequestBuilder<FieldsRequestBu
      * @returns {Promise<SpaceFieldsDtoApiOperationResult>}
      * @throws {ProblemDetails} error when the service returns a 400 status code
      * @throws {ProblemDetails} error when the service returns a 404 status code
+     * @throws {ProblemDetails} error when the service returns a 413 status code
      */
      put(body: SpaceFieldsDto, requestConfiguration?: RequestConfiguration<object> | undefined) : Promise<SpaceFieldsDtoApiOperationResult | undefined>;
     /**
@@ -39,6 +40,7 @@ export const FieldsRequestBuilderRequestsMetadata: RequestsMetadata = {
         errorMappings: {
             400: createProblemDetailsFromDiscriminatorValue as ParsableFactory<Parsable>,
             404: createProblemDetailsFromDiscriminatorValue as ParsableFactory<Parsable>,
+            413: createProblemDetailsFromDiscriminatorValue as ParsableFactory<Parsable>,
         },
         adapterMethodName: "send",
         responseBodyFactory:  createSpaceFieldsDtoApiOperationResultFromDiscriminatorValue,

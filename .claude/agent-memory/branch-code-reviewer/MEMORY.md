@@ -12,3 +12,4 @@
 - [Corroborating manual observation claims](corroborating-manual-observation-claims.md) — "I read the SQL log" is checkable: look for detail the plan couldn't have supplied (real table names vs the plan's idealized text)
 - [Optimistic rollback review checks](optimistic-rollback-review-checks.md) — two silent-data-loss shapes in the store flush: snapshot Object.assign stomping child arrays; cascade delete racing reassignment updates
 - [Empty fixtures hide rollback bugs](empty-fixtures-hide-rollback-bugs.md) — a green test over `zones: []`/`items: []` proves nothing about code that copies those arrays; read the fixture builder
+- [Lazy-list / pagination regression checks](lazy-list-pagination-regression-checks.md) — deep-link reachability + client-side aggregates over now-empty items/zones arrays are the two off-diff regressions of a slim-list slice

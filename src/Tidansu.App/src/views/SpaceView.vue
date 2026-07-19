@@ -1,64 +1,96 @@
 <template>
-    <div
-        v-if="space"
-        class="mx-auto w-full max-w-[1240px] pt-6 sm:pt-8"
-    >
+    <div class="mx-auto w-full max-w-[1240px] pt-6 sm:pt-8">
         <SpaceHeader
+            v-if="space"
             :space="space"
             :view-mode="viewMode"
             @set-view="onSetView"
         />
 
-        <!-- List view -->
-        <div v-if="viewMode === 'list'">
-            <div class="mt-6">
-                <SmartAdd
-                    :last-zone-name="lastZoneName"
-                    @add="onAdd"
-                />
-            </div>
-
-            <ItemList
-                :space="space"
-                @select="onSelect"
-                @remove="onRemove"
+        <!-- Contents still loading (B-16 FR-5) — must never be mistaken for the empty state -->
+        <div
+            v-if="isLoadingContents"
+            class="mt-10 flex flex-col items-center py-10 text-center"
+        >
+            <BaseIcon
+                name="cabinet"
+                :size="28"
+                class="animate-pulse text-text-2"
             />
-
-            <div
-                v-if="showPromo"
-                class="mt-6"
-            >
-                <SeeAsLayoutPromo
-                    :item-count="space.items.length"
-                    @open="onOpenLayout"
-                    @dismiss="dismissPromo"
-                />
-            </div>
+            <p class="mt-4 text-[14px] text-text-2">Loading…</p>
         </div>
 
-        <!-- Layout view + editor -->
-        <template v-else>
-            <LayoutEditor
-                v-if="editing"
-                :space="space"
-                @done="stopEditing"
-                @add-column-zone="onAddColumnZone"
-                @add-free-zone="onAddFreeZone"
-                @update-zone="onUpdateZone"
-                @delete-zone="onDeleteZone"
-                @convert="onConvert"
-            />
-            <LayoutView
-                v-else
-                :space="space"
-                :selected-id="selectedId"
-                @select="onSelect"
-                @add="onLayoutAdd"
-                @edit="startEditing"
-            />
+        <!-- Contents failed to load (review N1) — distinct from both loading and empty -->
+        <BaseEmptyState
+            v-else-if="loadFailed"
+            class="mt-10"
+            icon="restart"
+            title="Couldn't load this space"
+            description="Something went wrong loading its contents. Check your connection and try again."
+        >
+            <template #action>
+                <BaseButton
+                    size="sm"
+                    @click="onRetry"
+                >
+                    Retry
+                </BaseButton>
+            </template>
+        </BaseEmptyState>
+
+        <template v-else-if="space">
+            <!-- List view -->
+            <div v-if="viewMode === 'list'">
+                <div class="mt-6">
+                    <SmartAdd
+                        :last-zone-name="lastZoneName"
+                        @add="onAdd"
+                    />
+                </div>
+
+                <ItemList
+                    :space="space"
+                    @select="onSelect"
+                    @remove="onRemove"
+                />
+
+                <div
+                    v-if="showPromo"
+                    class="mt-6"
+                >
+                    <SeeAsLayoutPromo
+                        :item-count="space.items.length"
+                        @open="onOpenLayout"
+                        @dismiss="dismissPromo"
+                    />
+                </div>
+            </div>
+
+            <!-- Layout view + editor -->
+            <template v-else>
+                <LayoutEditor
+                    v-if="editing"
+                    :space="space"
+                    @done="stopEditing"
+                    @add-column-zone="onAddColumnZone"
+                    @add-free-zone="onAddFreeZone"
+                    @update-zone="onUpdateZone"
+                    @delete-zone="onDeleteZone"
+                    @convert="onConvert"
+                />
+                <LayoutView
+                    v-else
+                    :space="space"
+                    :selected-id="selectedId"
+                    @select="onSelect"
+                    @add="onLayoutAdd"
+                    @edit="startEditing"
+                />
+            </template>
         </template>
 
         <ItemDetailModal
+            v-if="space"
             :open="isDetailOpen"
             :item="selectedItem"
             :zone="selectedZone"
@@ -71,6 +103,7 @@
         />
 
         <ItemFormModal
+            v-if="space"
             :open="isFormOpen"
             :mode="formMode"
             :zone-label="addZoneLabel"
@@ -82,6 +115,7 @@
 </template>
 
 <script setup lang="ts">
+    import { BaseButton, BaseEmptyState, BaseIcon } from '@/components/base';
     import ItemFormModal from '@/components/space/ItemFormModal.vue';
     import ItemDetailModal from '@/components/space/ItemDetailModal.vue';
     import ItemList from '@/components/space/ItemList.vue';
@@ -108,6 +142,14 @@
 
     const space = computed(() => store.getById(props.id));
     const viewMode = computed<ViewMode>(() => space.value?.viewMode ?? 'list');
+    // B-16 FR-5: a space's contents load lazily on open — this must render as an
+    // explicit loading state, distinct from the genuine "no zones yet" empty state
+    // that `ItemList`/`LayoutView` render once contents are loaded. `loadFailed`
+    // (review N1) is driven off the store's real failed-fetch flag so a transient
+    // error surfaces a retry affordance instead of an infinite spinner.
+    const showContents = computed(() => store.isContentsLoaded(props.id));
+    const loadFailed = computed(() => store.isContentsFailed(props.id));
+    const isLoadingContents = computed(() => !showContents.value && !loadFailed.value);
 
     const selectedId = ref<string | null>(null);
     const lastZoneId = ref<string | null>(null);
@@ -115,13 +157,36 @@
     const editing = ref(false);
     const addTarget = ref<{ zoneId: string; depth: ItemDepth; level: number } | null>(null);
     const editId = ref<string | null>(null);
+    // The last id `space` was known non-null for — disambiguates "not loaded yet"
+    // (e.g. the M1 deep-link fetch below still in flight) from "was open, now gone"
+    // (e.g. deleted in another session) so only the latter bounces to the dashboard.
+    const lastKnownId = ref<string | null>(null);
 
-    // Track the open space; bounce to the dashboard if the id is unknown (e.g. deleted).
+    // Track the open space: mark it current once known. If the space we were viewing
+    // vanishes from the store without the route changing, bounce to the dashboard.
     watch(
         space,
         (value) => {
-            if (!value) router.replace({ name: 'spaces' });
-            else store.currentId = value.id;
+            if (value) {
+                store.currentId = value.id;
+                lastKnownId.value = value.id;
+            } else if (lastKnownId.value === props.id) {
+                router.replace({ name: 'spaces' });
+            }
+        },
+        { immediate: true }
+    );
+
+    // Fetch this space's full (photo-less) contents on open (B-16 FR-2). B-16 M1: when
+    // the routed id isn't among the loaded summary pages (a deep-link or refresh to a
+    // space beyond page 1), the store fetches it directly and inserts it rather than
+    // leaving `space` unknown — only a confirmed 404 redirects to the dashboard here;
+    // any other failure surfaces as the `loadFailed` state above.
+    watch(
+        () => props.id,
+        async (id) => {
+            const result = await store.loadSpaceContents(id);
+            if (result === 'not-found') router.replace({ name: 'spaces' });
         },
         { immediate: true }
     );
@@ -186,6 +251,9 @@
         // Close the item detail so the paywall sits cleanly on top (both teleport to body).
         selectedId.value = null;
         limits.openPaywall('photos');
+    }
+    function onRetry() {
+        void store.loadSpaceContents(props.id);
     }
 
     // ---- layout view + editor ----

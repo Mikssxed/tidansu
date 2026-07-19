@@ -404,24 +404,6 @@ export function createSpaceDtoFromDiscriminatorValue(parseNode: ParseNode | unde
 /**
  * Creates a new instance of the appropriate class based on discriminator value
  * @param parseNode The parse node to use to read the discriminator value and create the object
- * @returns {SpaceDtoListApiOperationResult_errors}
- */
-// @ts-ignore
-export function createSpaceDtoListApiOperationResult_errorsFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
-    return deserializeIntoSpaceDtoListApiOperationResult_errors;
-}
-/**
- * Creates a new instance of the appropriate class based on discriminator value
- * @param parseNode The parse node to use to read the discriminator value and create the object
- * @returns {SpaceDtoListApiOperationResult}
- */
-// @ts-ignore
-export function createSpaceDtoListApiOperationResultFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
-    return deserializeIntoSpaceDtoListApiOperationResult;
-}
-/**
- * Creates a new instance of the appropriate class based on discriminator value
- * @param parseNode The parse node to use to read the discriminator value and create the object
  * @returns {SpaceFieldsDtoApiOperationResult_errors}
  */
 // @ts-ignore
@@ -445,6 +427,42 @@ export function createSpaceFieldsDtoApiOperationResultFromDiscriminatorValue(par
 // @ts-ignore
 export function createSpaceFieldsDtoFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
     return deserializeIntoSpaceFieldsDto;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {SpaceSummaryDto}
+ */
+// @ts-ignore
+export function createSpaceSummaryDtoFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoSpaceSummaryDto;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {SpaceSummaryDtoPagedResultApiOperationResult_errors}
+ */
+// @ts-ignore
+export function createSpaceSummaryDtoPagedResultApiOperationResult_errorsFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoSpaceSummaryDtoPagedResultApiOperationResult_errors;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {SpaceSummaryDtoPagedResultApiOperationResult}
+ */
+// @ts-ignore
+export function createSpaceSummaryDtoPagedResultApiOperationResultFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoSpaceSummaryDtoPagedResultApiOperationResult;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {SpaceSummaryDtoPagedResult}
+ */
+// @ts-ignore
+export function createSpaceSummaryDtoPagedResultFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoSpaceSummaryDtoPagedResult;
 }
 /**
  * Creates a new instance of the appropriate class based on discriminator value
@@ -855,29 +873,6 @@ export function deserializeIntoSpaceDtoApiOperationResult_errors(spaceDtoApiOper
 }
 /**
  * The deserialization information for the current model
- * @param SpaceDtoListApiOperationResult The instance to deserialize into.
- * @returns {Record<string, (node: ParseNode) => void>}
- */
-// @ts-ignore
-export function deserializeIntoSpaceDtoListApiOperationResult(spaceDtoListApiOperationResult: Partial<SpaceDtoListApiOperationResult> | undefined = {}) : Record<string, (node: ParseNode) => void> {
-    return {
-        "data": n => { spaceDtoListApiOperationResult.data = n.getCollectionOfObjectValues<SpaceDto>(createSpaceDtoFromDiscriminatorValue); },
-        "errors": n => { spaceDtoListApiOperationResult.errors = n.getObjectValue<SpaceDtoListApiOperationResult_errors>(createSpaceDtoListApiOperationResult_errorsFromDiscriminatorValue); },
-        "isSuccess": n => { spaceDtoListApiOperationResult.isSuccess = n.getBooleanValue(); },
-    }
-}
-/**
- * The deserialization information for the current model
- * @param SpaceDtoListApiOperationResult_errors The instance to deserialize into.
- * @returns {Record<string, (node: ParseNode) => void>}
- */
-// @ts-ignore
-export function deserializeIntoSpaceDtoListApiOperationResult_errors(spaceDtoListApiOperationResult_errors: Partial<SpaceDtoListApiOperationResult_errors> | undefined = {}) : Record<string, (node: ParseNode) => void> {
-    return {
-    }
-}
-/**
- * The deserialization information for the current model
  * @param SpaceFieldsDto The instance to deserialize into.
  * @returns {Record<string, (node: ParseNode) => void>}
  */
@@ -912,6 +907,63 @@ export function deserializeIntoSpaceFieldsDtoApiOperationResult(spaceFieldsDtoAp
  */
 // @ts-ignore
 export function deserializeIntoSpaceFieldsDtoApiOperationResult_errors(spaceFieldsDtoApiOperationResult_errors: Partial<SpaceFieldsDtoApiOperationResult_errors> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param SpaceSummaryDto The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoSpaceSummaryDto(spaceSummaryDto: Partial<SpaceSummaryDto> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "canvasMode": n => { spaceSummaryDto.canvasMode = n.getStringValue(); },
+        "columnLabels": n => { spaceSummaryDto.columnLabels = n.getCollectionOfPrimitiveValues<string>("string"); },
+        "id": n => { spaceSummaryDto.id = n.getStringValue(); },
+        "itemCount": n => { spaceSummaryDto.itemCount = n.getNumberValue(); },
+        "layoutColumns": n => { spaceSummaryDto.layoutColumns = n.getNumberValue(); },
+        "name": n => { spaceSummaryDto.name = n.getStringValue(); },
+        "previewColors": n => { spaceSummaryDto.previewColors = n.getCollectionOfPrimitiveValues<string>("string"); },
+        "type": n => { spaceSummaryDto.type = n.getStringValue(); },
+        "viewMode": n => { spaceSummaryDto.viewMode = n.getStringValue(); },
+        "zoneCount": n => { spaceSummaryDto.zoneCount = n.getNumberValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param SpaceSummaryDtoPagedResult The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoSpaceSummaryDtoPagedResult(spaceSummaryDtoPagedResult: Partial<SpaceSummaryDtoPagedResult> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "items": n => { spaceSummaryDtoPagedResult.items = n.getCollectionOfObjectValues<SpaceSummaryDto>(createSpaceSummaryDtoFromDiscriminatorValue); },
+        "page": n => { spaceSummaryDtoPagedResult.page = n.getNumberValue(); },
+        "pageSize": n => { spaceSummaryDtoPagedResult.pageSize = n.getNumberValue(); },
+        "totalCount": n => { spaceSummaryDtoPagedResult.totalCount = n.getNumberValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param SpaceSummaryDtoPagedResultApiOperationResult The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoSpaceSummaryDtoPagedResultApiOperationResult(spaceSummaryDtoPagedResultApiOperationResult: Partial<SpaceSummaryDtoPagedResultApiOperationResult> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "data": n => { spaceSummaryDtoPagedResultApiOperationResult.data = n.getObjectValue<SpaceSummaryDtoPagedResult>(createSpaceSummaryDtoPagedResultFromDiscriminatorValue); },
+        "errors": n => { spaceSummaryDtoPagedResultApiOperationResult.errors = n.getObjectValue<SpaceSummaryDtoPagedResultApiOperationResult_errors>(createSpaceSummaryDtoPagedResultApiOperationResult_errorsFromDiscriminatorValue); },
+        "isSuccess": n => { spaceSummaryDtoPagedResultApiOperationResult.isSuccess = n.getBooleanValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param SpaceSummaryDtoPagedResultApiOperationResult_errors The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoSpaceSummaryDtoPagedResultApiOperationResult_errors(spaceSummaryDtoPagedResultApiOperationResult_errors: Partial<SpaceSummaryDtoPagedResultApiOperationResult_errors> | undefined = {}) : Record<string, (node: ParseNode) => void> {
     return {
     }
 }
@@ -1542,30 +1594,6 @@ export function serializeSpaceDtoApiOperationResult_errors(writer: Serialization
 /**
  * Serializes information the current object
  * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
- * @param SpaceDtoListApiOperationResult The instance to serialize from.
- * @param writer Serialization writer to use to serialize this model
- */
-// @ts-ignore
-export function serializeSpaceDtoListApiOperationResult(writer: SerializationWriter, spaceDtoListApiOperationResult: Partial<SpaceDtoListApiOperationResult> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
-    if (!spaceDtoListApiOperationResult || isSerializingDerivedType) { return; }
-    writer.writeCollectionOfObjectValues<SpaceDto>("data", spaceDtoListApiOperationResult.data, serializeSpaceDto);
-    writer.writeObjectValue<SpaceDtoListApiOperationResult_errors>("errors", spaceDtoListApiOperationResult.errors, serializeSpaceDtoListApiOperationResult_errors);
-    writer.writeBooleanValue("isSuccess", spaceDtoListApiOperationResult.isSuccess);
-}
-/**
- * Serializes information the current object
- * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
- * @param SpaceDtoListApiOperationResult_errors The instance to serialize from.
- * @param writer Serialization writer to use to serialize this model
- */
-// @ts-ignore
-export function serializeSpaceDtoListApiOperationResult_errors(writer: SerializationWriter, spaceDtoListApiOperationResult_errors: Partial<SpaceDtoListApiOperationResult_errors> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
-    if (!spaceDtoListApiOperationResult_errors || isSerializingDerivedType) { return; }
-    writer.writeAdditionalData(spaceDtoListApiOperationResult_errors.additionalData);
-}
-/**
- * Serializes information the current object
- * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
  * @param SpaceFieldsDto The instance to serialize from.
  * @param writer Serialization writer to use to serialize this model
  */
@@ -1602,6 +1630,64 @@ export function serializeSpaceFieldsDtoApiOperationResult(writer: SerializationW
 export function serializeSpaceFieldsDtoApiOperationResult_errors(writer: SerializationWriter, spaceFieldsDtoApiOperationResult_errors: Partial<SpaceFieldsDtoApiOperationResult_errors> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
     if (!spaceFieldsDtoApiOperationResult_errors || isSerializingDerivedType) { return; }
     writer.writeAdditionalData(spaceFieldsDtoApiOperationResult_errors.additionalData);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param SpaceSummaryDto The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeSpaceSummaryDto(writer: SerializationWriter, spaceSummaryDto: Partial<SpaceSummaryDto> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!spaceSummaryDto || isSerializingDerivedType) { return; }
+    writer.writeStringValue("canvasMode", spaceSummaryDto.canvasMode);
+    writer.writeCollectionOfPrimitiveValues<string>("columnLabels", spaceSummaryDto.columnLabels);
+    writer.writeStringValue("id", spaceSummaryDto.id);
+    writer.writeNumberValue("itemCount", spaceSummaryDto.itemCount);
+    writer.writeNumberValue("layoutColumns", spaceSummaryDto.layoutColumns);
+    writer.writeStringValue("name", spaceSummaryDto.name);
+    writer.writeCollectionOfPrimitiveValues<string>("previewColors", spaceSummaryDto.previewColors);
+    writer.writeStringValue("type", spaceSummaryDto.type);
+    writer.writeStringValue("viewMode", spaceSummaryDto.viewMode);
+    writer.writeNumberValue("zoneCount", spaceSummaryDto.zoneCount);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param SpaceSummaryDtoPagedResult The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeSpaceSummaryDtoPagedResult(writer: SerializationWriter, spaceSummaryDtoPagedResult: Partial<SpaceSummaryDtoPagedResult> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!spaceSummaryDtoPagedResult || isSerializingDerivedType) { return; }
+    writer.writeCollectionOfObjectValues<SpaceSummaryDto>("items", spaceSummaryDtoPagedResult.items, serializeSpaceSummaryDto);
+    writer.writeNumberValue("page", spaceSummaryDtoPagedResult.page);
+    writer.writeNumberValue("pageSize", spaceSummaryDtoPagedResult.pageSize);
+    writer.writeNumberValue("totalCount", spaceSummaryDtoPagedResult.totalCount);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param SpaceSummaryDtoPagedResultApiOperationResult The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeSpaceSummaryDtoPagedResultApiOperationResult(writer: SerializationWriter, spaceSummaryDtoPagedResultApiOperationResult: Partial<SpaceSummaryDtoPagedResultApiOperationResult> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!spaceSummaryDtoPagedResultApiOperationResult || isSerializingDerivedType) { return; }
+    writer.writeObjectValue<SpaceSummaryDtoPagedResult>("data", spaceSummaryDtoPagedResultApiOperationResult.data, serializeSpaceSummaryDtoPagedResult);
+    writer.writeObjectValue<SpaceSummaryDtoPagedResultApiOperationResult_errors>("errors", spaceSummaryDtoPagedResultApiOperationResult.errors, serializeSpaceSummaryDtoPagedResultApiOperationResult_errors);
+    writer.writeBooleanValue("isSuccess", spaceSummaryDtoPagedResultApiOperationResult.isSuccess);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param SpaceSummaryDtoPagedResultApiOperationResult_errors The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeSpaceSummaryDtoPagedResultApiOperationResult_errors(writer: SerializationWriter, spaceSummaryDtoPagedResultApiOperationResult_errors: Partial<SpaceSummaryDtoPagedResultApiOperationResult_errors> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!spaceSummaryDtoPagedResultApiOperationResult_errors || isSerializingDerivedType) { return; }
+    writer.writeAdditionalData(spaceSummaryDtoPagedResultApiOperationResult_errors.additionalData);
 }
 /**
  * Serializes information the current object
@@ -1723,22 +1809,6 @@ export interface SpaceDtoApiOperationResult extends Parsable {
 }
 export interface SpaceDtoApiOperationResult_errors extends AdditionalDataHolder, Parsable {
 }
-export interface SpaceDtoListApiOperationResult extends Parsable {
-    /**
-     * The data property
-     */
-    data?: SpaceDto[] | null;
-    /**
-     * The errors property
-     */
-    errors: SpaceDtoListApiOperationResult_errors;
-    /**
-     * The isSuccess property
-     */
-    isSuccess: boolean;
-}
-export interface SpaceDtoListApiOperationResult_errors extends AdditionalDataHolder, Parsable {
-}
 export interface SpaceFieldsDto extends Parsable {
     /**
      * The canvasMode property
@@ -1780,6 +1850,82 @@ export interface SpaceFieldsDtoApiOperationResult extends Parsable {
     isSuccess: boolean;
 }
 export interface SpaceFieldsDtoApiOperationResult_errors extends AdditionalDataHolder, Parsable {
+}
+export interface SpaceSummaryDto extends Parsable {
+    /**
+     * The canvasMode property
+     */
+    canvasMode: string;
+    /**
+     * The columnLabels property
+     */
+    columnLabels?: string[] | null;
+    /**
+     * The id property
+     */
+    id: string;
+    /**
+     * The itemCount property
+     */
+    itemCount: number;
+    /**
+     * The layoutColumns property
+     */
+    layoutColumns: number;
+    /**
+     * The name property
+     */
+    name: string;
+    /**
+     * The previewColors property
+     */
+    previewColors: string[];
+    /**
+     * The type property
+     */
+    type: string;
+    /**
+     * The viewMode property
+     */
+    viewMode: string;
+    /**
+     * The zoneCount property
+     */
+    zoneCount: number;
+}
+export interface SpaceSummaryDtoPagedResult extends Parsable {
+    /**
+     * The items property
+     */
+    items: SpaceSummaryDto[];
+    /**
+     * The page property
+     */
+    page: number;
+    /**
+     * The pageSize property
+     */
+    pageSize: number;
+    /**
+     * The totalCount property
+     */
+    totalCount: number;
+}
+export interface SpaceSummaryDtoPagedResultApiOperationResult extends Parsable {
+    /**
+     * The data property
+     */
+    data: SpaceSummaryDtoPagedResult;
+    /**
+     * The errors property
+     */
+    errors: SpaceSummaryDtoPagedResultApiOperationResult_errors;
+    /**
+     * The isSuccess property
+     */
+    isSuccess: boolean;
+}
+export interface SpaceSummaryDtoPagedResultApiOperationResult_errors extends AdditionalDataHolder, Parsable {
 }
 export interface UsageDto extends Parsable {
     /**

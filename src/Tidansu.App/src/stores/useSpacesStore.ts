@@ -1,6 +1,6 @@
 import { useApiClient } from '@/composables/useApiClient';
 import { openPaywall } from '@/composables/useLimits';
-import { planReasonOf, useSpacesApi } from '@/composables/useSpacesApi';
+import { isNotFoundError, planReasonOf, useSpacesApi } from '@/composables/useSpacesApi';
 import { matchZone, parseAdd } from '@/data/items';
 import type { PaywallReason } from '@/data/paywall';
 import type { ChangeSet, FlushOperation, FlushPlan } from '@/data/pendingChanges';
@@ -16,11 +16,14 @@ import {
     takeFlushPlan,
 } from '@/data/pendingChanges';
 import { seedFridge } from '@/data/seed';
-import { flowFreeform, makeZone, uid } from '@/data/spaces';
+import { flowFreeform, makeZone, summarize, uid } from '@/data/spaces';
 import type { Item, Rect, Space, ViewMode, Zone, ZoneKind } from '@/data/types';
-import { queryClient, SPACES_QUERY_KEY } from '@/queryClient';
+import { queryClient, spaceContentsKey, spacesQueryKey } from '@/queryClient';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
+
+/** Spaces-summary page size (matches the API controller's default, see B-16). */
+const PAGE_SIZE = 20;
 
 /** Build a new item, assigning the next free slot index within its zone. */
 function makeItem(space: Space, name: string, zoneId: string, quantity: number): Item {
@@ -69,10 +72,44 @@ export const useSpacesStore = defineStore('spaces', () => {
         new Map()
     );
 
-    const count = computed(() => spaces.value.length);
+    // ---- pagination (B-16 FR-9) ----
+    /** Account-wide total from the last page fetched — the authoritative "used" count. */
+    const total = ref(0);
+    const loadedPage = ref(0);
+    let loadingMore = false;
+
+    // ---- per-space contents lazy-load (B-16 FR-2/4/5) ----
+    /** Spaces whose full zone/item graph has been fetched (or built locally). */
+    const contentsLoaded = ref<Set<string>>(new Set());
+    /** Spaces with a contents fetch currently in flight. */
+    const contentsLoading = ref<Set<string>>(new Set());
+    /** Spaces whose most recent contents fetch failed (review N1) — cleared on retry. */
+    const contentsFailed = ref<Set<string>>(new Set());
+
+    /** Outcome of `loadSpaceContents`: 'not-found' is a confirmed 404 (safe to redirect
+     * away from); 'error' is any other failure (network, 500 — show retry, don't redirect). */
+    type ContentsLoadResult = 'ok' | 'not-found' | 'error';
+
+    const count = computed(() => total.value);
+    const hasMoreSpaces = computed(() => spaces.value.length < total.value);
     const currentSpace = computed(
         () => spaces.value.find((s) => s.id === currentId.value) ?? null
     );
+
+    function isContentsLoaded(id: string): boolean {
+        return contentsLoaded.value.has(id);
+    }
+    function isContentsLoading(id: string): boolean {
+        return contentsLoading.value.has(id);
+    }
+    function isContentsFailed(id: string): boolean {
+        return contentsFailed.value.has(id);
+    }
+
+    /** Refresh a space's dashboard-summary fields after a local zone/item mutation. */
+    function refreshSummary(space: Space): void {
+        Object.assign(space, summarize(space.zones, space.items));
+    }
 
     function getById(id: string): Space | null {
         return spaces.value.find((s) => s.id === id) ?? null;
@@ -112,6 +149,9 @@ export const useSpacesStore = defineStore('spaces', () => {
         changeSets.delete(spaceId);
         inFlight.delete(spaceId);
         saveState.value.delete(`space:${spaceId}`);
+        contentsLoaded.value.delete(spaceId);
+        contentsLoading.value.delete(spaceId);
+        contentsFailed.value.delete(spaceId);
     }
 
     /**
@@ -131,6 +171,7 @@ export const useSpacesStore = defineStore('spaces', () => {
      */
     function handleCreateError(space: Space, error: unknown): void {
         discardSpaceLocally(space.id);
+        total.value = Math.max(0, total.value - 1);
         const reason = planReasonOf(error);
         if (reason) openPaywall(reason);
         else console.error('[spaces] space create failed', error);
@@ -354,20 +395,95 @@ export const useSpacesStore = defineStore('spaces', () => {
         void api.remove(id).catch(handleDeleteError);
     }
 
-    /** Load spaces from the server; seed a starter fridge when the account has none. */
+    /** Load page 1 of space summaries from the server; seed a starter fridge when the account has none. */
     async function hydrate(force = false): Promise<void> {
         if (hydrated.value && !force) return;
-        const list = force
-            ? await api.list()
-            : await queryClient.fetchQuery({ queryKey: SPACES_QUERY_KEY, queryFn: () => api.list() });
-        if (force) queryClient.setQueryData(SPACES_QUERY_KEY, list);
-        spaces.value = list;
+        const key = spacesQueryKey(1);
+        const result = force
+            ? await api.listPage(1, PAGE_SIZE)
+            : await queryClient.fetchQuery({ queryKey: key, queryFn: () => api.listPage(1, PAGE_SIZE) });
+        if (force) queryClient.setQueryData(key, result);
+        // Keep any fully-loaded space this page doesn't include (B-16 M1: a deep-link/
+        // refresh fetched a page-2+ space directly, possibly concurrently with this
+        // call) — a plain overwrite would silently undo that fetch.
+        const freshIds = new Set(result.spaces.map((s) => s.id));
+        const deepLinked = spaces.value.filter((s) => !freshIds.has(s.id) && contentsLoaded.value.has(s.id));
+        spaces.value = [...result.spaces, ...deepLinked];
+        total.value = result.total;
+        loadedPage.value = result.page;
         hydrated.value = true;
 
-        if (spaces.value.length === 0) {
+        if (total.value === 0) {
             const starter = seedFridge();
             spaces.value.push(starter);
+            contentsLoaded.value.add(starter.id);
+            total.value += 1;
             createRemote(starter);
+        }
+    }
+
+    /** Fetch the next page of summaries and append it (B-16 FR-6 "Load more"). */
+    async function loadMoreSpaces(): Promise<void> {
+        if (loadingMore || !hasMoreSpaces.value) return;
+        loadingMore = true;
+        try {
+            const nextPage = loadedPage.value + 1;
+            const key = spacesQueryKey(nextPage);
+            const result = await queryClient.fetchQuery({
+                queryKey: key,
+                queryFn: () => api.listPage(nextPage, PAGE_SIZE),
+            });
+            spaces.value.push(...result.spaces);
+            total.value = result.total;
+            loadedPage.value = result.page;
+        } finally {
+            loadingMore = false;
+        }
+    }
+
+    /**
+     * Fetch one space's full (photo-less) zone/item graph — no-op if already loaded or
+     * in flight. A client-created space (seeded/added/duplicated) is pre-marked loaded
+     * (see `addSpace`/`duplicateSpace`/`hydrate`'s starter seed) so opening it never
+     * fires a fetch that would clobber its unsynced local edits.
+     *
+     * B-16 M1: if `id` isn't in the loaded summary pages (a deep-link or refresh to a
+     * space beyond page 1), `getById` returns null — rather than treating that as
+     * unknown, this fetches the space directly via `GET /{id}` and inserts the result
+     * into `spaces.value`, so the caller (`SpaceView`'s watch) never has to redirect a
+     * space that genuinely exists.
+     *
+     * Returns 'not-found' only on a confirmed 404 (safe to redirect away from);
+     * any other failure returns 'error' and leaves `isContentsFailed(id)` true so the
+     * caller can render a retry affordance instead of an infinite spinner (review N1).
+     */
+    async function loadSpaceContents(id: string): Promise<ContentsLoadResult> {
+        if (contentsLoaded.value.has(id)) return 'ok';
+        if (contentsLoading.value.has(id)) return 'ok';
+        contentsLoading.value.add(id);
+        contentsFailed.value.delete(id); // a retry clears any previous failure
+        try {
+            const full = await queryClient.fetchQuery({
+                queryKey: spaceContentsKey(id),
+                queryFn: () => api.get(id),
+            });
+            const existing = getById(id);
+            if (existing) {
+                existing.zones = full.zones;
+                existing.items = full.items;
+                refreshSummary(existing);
+            } else {
+                spaces.value.push(full);
+            }
+            contentsLoaded.value.add(id);
+            return 'ok';
+        } catch (e) {
+            if (isNotFoundError(e)) return 'not-found';
+            console.error('[spaces] failed to load space contents', e);
+            contentsFailed.value.add(id);
+            return 'error';
+        } finally {
+            contentsLoading.value.delete(id);
         }
     }
 
@@ -381,7 +497,13 @@ export const useSpacesStore = defineStore('spaces', () => {
         spaces.value = [];
         currentId.value = null;
         hydrated.value = false;
-        queryClient.removeQueries({ queryKey: SPACES_QUERY_KEY });
+        total.value = 0;
+        loadedPage.value = 0;
+        contentsLoaded.value = new Set();
+        contentsLoading.value = new Set();
+        contentsFailed.value = new Set();
+        queryClient.removeQueries({ queryKey: ['spaces'] });
+        queryClient.removeQueries({ queryKey: ['space'] });
     }
 
     // ---- spaces ----
@@ -389,6 +511,9 @@ export const useSpacesStore = defineStore('spaces', () => {
     /** Append a freshly built space (from the onboarding flow). Returns its id. */
     function addSpace(space: Space): string {
         spaces.value.push(space);
+        // Fully built client-side already — never re-fetch its contents (see loadSpaceContents doc).
+        contentsLoaded.value.add(space.id);
+        total.value += 1;
         createRemote(space);
         return space.id;
     }
@@ -402,8 +527,19 @@ export const useSpacesStore = defineStore('spaces', () => {
         }
     }
 
-    /** Deep-copy a space with fresh ids on the space, zones and items. Returns the new id. */
-    function duplicateSpace(id: string): string | null {
+    /**
+     * Deep-copy a space with fresh ids on the space, zones and items. Returns the new
+     * id, or `null` if the source space no longer exists or its contents couldn't be
+     * loaded.
+     *
+     * The dashboard can duplicate a space whose contents were never opened (B-16 lazy
+     * load leaves `zones`/`items` empty until then) — load them first, or the copy
+     * would silently come out empty. Review N2: if that load fails, abort instead of
+     * POSTing an empty copy of a space that actually has contents.
+     */
+    async function duplicateSpace(id: string): Promise<string | null> {
+        const result = await loadSpaceContents(id);
+        if (result !== 'ok') return null;
         const orig = getById(id);
         if (!orig) return null;
 
@@ -427,10 +563,14 @@ export const useSpacesStore = defineStore('spaces', () => {
             columnLabels: orig.columnLabels ? [...orig.columnLabels] : null,
             zones,
             items,
+            ...summarize(zones, items),
         };
 
         const idx = spaces.value.findIndex((s) => s.id === id);
         spaces.value.splice(idx + 1, 0, copy);
+        // Fully built client-side already — never re-fetch its contents.
+        contentsLoaded.value.add(copy.id);
+        total.value += 1;
         createRemote(copy);
         return copy.id;
     }
@@ -438,6 +578,10 @@ export const useSpacesStore = defineStore('spaces', () => {
     function deleteSpace(id: string): void {
         spaces.value = spaces.value.filter((s) => s.id !== id);
         if (currentId.value === id) currentId.value = null;
+        total.value = Math.max(0, total.value - 1);
+        contentsLoaded.value.delete(id);
+        contentsLoading.value.delete(id);
+        contentsFailed.value.delete(id);
         deleteRemote(id);
     }
 
@@ -452,6 +596,7 @@ export const useSpacesStore = defineStore('spaces', () => {
         const zone = matchZone(zoneHint, space.zones, space.type) ?? space.zones[0]!;
         const item = makeItem(space, name, zone.id, quantity);
         space.items.push(item);
+        refreshSummary(space);
         stageAdd(getOrCreateChangeSet(spaceId), 'item', item);
         scheduleSave(spaceId);
         return item;
@@ -467,6 +612,7 @@ export const useSpacesStore = defineStore('spaces', () => {
         if (!space || !name.trim()) return null;
         const item = makeItem(space, name.trim(), zoneId, quantity);
         space.items.push(item);
+        refreshSummary(space);
         stageAdd(getOrCreateChangeSet(spaceId), 'item', item);
         scheduleSave(spaceId);
         return item;
@@ -477,6 +623,7 @@ export const useSpacesStore = defineStore('spaces', () => {
         const item = space?.items.find((it) => it.id === itemId);
         if (space && item) {
             space.items = space.items.filter((it) => it.id !== itemId);
+            refreshSummary(space);
             stageDelete(getOrCreateChangeSet(spaceId), 'item', item);
             scheduleSave(spaceId);
         }
@@ -511,6 +658,7 @@ export const useSpacesStore = defineStore('spaces', () => {
             column,
         });
         space.zones.push(zone);
+        refreshSummary(space);
         stageAdd(getOrCreateChangeSet(spaceId), 'zone', zone);
         scheduleSave(spaceId);
         return zone;
@@ -527,6 +675,7 @@ export const useSpacesStore = defineStore('spaces', () => {
             rect,
         });
         space.zones.push(zone);
+        refreshSummary(space);
         stageAdd(getOrCreateChangeSet(spaceId), 'zone', zone);
         scheduleSave(spaceId);
         return zone;
@@ -550,6 +699,7 @@ export const useSpacesStore = defineStore('spaces', () => {
         const itemsInZone = space.items.filter((it) => it.zoneId === zoneId);
         space.zones = space.zones.filter((z) => z.id !== zoneId);
         space.items = space.items.filter((it) => it.zoneId !== zoneId);
+        refreshSummary(space);
         stageZoneDelete(getOrCreateChangeSet(spaceId), zone, itemsInZone);
         scheduleSave(spaceId);
     }
@@ -577,11 +727,17 @@ export const useSpacesStore = defineStore('spaces', () => {
         spaces,
         currentId,
         count,
+        hasMoreSpaces,
         currentSpace,
         hydrated,
         saveState,
         getById,
         hydrate,
+        loadMoreSpaces,
+        loadSpaceContents,
+        isContentsLoading,
+        isContentsLoaded,
+        isContentsFailed,
         reset,
         addSpace,
         renameSpace,

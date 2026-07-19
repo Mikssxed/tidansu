@@ -42,17 +42,32 @@ public class UpdateItemCommandHandler(
         // dto.Photo) would always yield PhotoChange.None, silently disabling the photo
         // gate on every update.
         var existingPhoto = item.Photo;
-        var photoChange = PhotoPolicy.PhotoChangeBetween(existingPhoto, dto.Photo);
 
-        // Plan gate BEFORE SpacePhotoGuard and before any mutation of tracked state
-        // (T-13 rule 3 / B-13 D-8.2): a Free user sending a photo — valid or invalid —
-        // must get 403 {plan:["photos"]}, never SpacePhotoGuard's 400. No items-count
-        // gate here (D-1): an update never changes the item count.
-        if (PlanPolicy.CheckItemPhotoChange(user.Plan, photoChange) is { } reason)
-            throw new PlanLimitException(reason);
+        // B-16 FR-3 / 🪤: since GET no longer returns Photo (SC-3), a client that never
+        // received the stored photo always round-trips dto.Photo == null. A blind
+        // `item.Photo = dto.Photo` would therefore wipe every stored photo on the next
+        // edit. Patch semantics close that: null incoming photo means "leave unchanged";
+        // only a non-null photo runs the gate/guard/set path. Branch on `is not null`,
+        // NEVER string.IsNullOrEmpty — an empty string "" is still PhotoChange.Added
+        // (PhotoPolicy) and must still hit the 403 gate below, not skip straight past it.
+        if (dto.Photo is not null)
+        {
+            var photoChange = PhotoPolicy.PhotoChangeBetween(existingPhoto, dto.Photo);
 
-        // Runs after the plan gate, before any mutation of `item` below.
-        SpacePhotoGuard.ThrowIfInvalid(dto.Photo, "Item.Photo");
+            // Plan gate BEFORE SpacePhotoGuard and before any mutation of tracked state
+            // (T-13 rule 3 / B-13 D-8.2): a Free user sending a photo — valid or invalid —
+            // must get 403 {plan:["photos"]}, never SpacePhotoGuard's 400. No items-count
+            // gate here (D-1): an update never changes the item count.
+            if (PlanPolicy.CheckItemPhotoChange(user.Plan, photoChange) is { } reason)
+                throw new PlanLimitException(reason);
+
+            // Runs after the plan gate, before any mutation of `item` below.
+            SpacePhotoGuard.ThrowIfInvalid(dto.Photo, "Item.Photo");
+            item.Photo = dto.Photo;
+        }
+        // else: dto.Photo is null — leave item.Photo untouched (patch semantics, FR-3).
+        // Accepted consequence (handed to B-1): a photo can no longer be cleared via this
+        // endpoint by anyone, incl. Pro — inert today, since no UI clears one.
 
         item.Name = dto.Name;
         item.ZoneId = dto.ZoneId;
@@ -60,7 +75,6 @@ public class UpdateItemCommandHandler(
         item.Tags = [.. dto.Tags];
         item.DateAdded = dto.DateAdded;
         item.Expiry = dto.Expiry;
-        item.Photo = dto.Photo;
         item.SlotIndex = dto.SlotIndex;
         item.Depth = dto.Depth;
         item.Level = dto.Level;

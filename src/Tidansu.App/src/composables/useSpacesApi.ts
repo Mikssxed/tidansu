@@ -1,4 +1,13 @@
-import { toDtoBody, toItem, toItemDtoBody, toSpace, toSpaceFieldsBody, toZone, toZoneDtoBody } from '@/api/spaceMapping';
+import {
+    toDtoBody,
+    toItem,
+    toItemDtoBody,
+    toSpace,
+    toSpaceFieldsBody,
+    toSpaceSummary,
+    toZone,
+    toZoneDtoBody,
+} from '@/api/spaceMapping';
 import { useApiClient } from '@/composables/useApiClient';
 import type { PaywallReason } from '@/data/paywall';
 import type { Item, Space, Zone } from '@/data/types';
@@ -17,14 +26,43 @@ export function planReasonOf(error: unknown): PaywallReason | null {
     return PAYWALL_REASONS.includes(reason as PaywallReason) ? (reason as PaywallReason) : null;
 }
 
+/**
+ * True when a thrown Kiota error is a 404 — e.g. `GET /api/spaces/{id}` for a space
+ * the caller doesn't own or that no longer exists (B-16 M1 deep-link fallback).
+ */
+export function isNotFoundError(error: unknown): boolean {
+    return (error as { responseStatusCode?: number })?.responseStatusCode === 404;
+}
+
+/** One page of the slimmed spaces list — no zones/items/photos (B-16 SC-3). */
+export interface SpacesPage {
+    spaces: Space[];
+    total: number;
+    page: number;
+    pageSize: number;
+}
+
 /** Thin wrapper over the generated spaces endpoints, mapping to/from the app `Space` type. */
 export function useSpacesApi() {
     const client = useApiClient();
 
     return {
-        async list(): Promise<Space[]> {
-            const res = await client.api.spaces.get();
-            return (res?.data ?? []).map(toSpace);
+        /** `GET /api/spaces?page&pageSize` — dashboard summaries only, paginated. */
+        async listPage(page: number, pageSize: number): Promise<SpacesPage> {
+            const res = await client.api.spaces.get({ queryParameters: { page, pageSize } });
+            const data = res?.data;
+            return {
+                spaces: (data?.items ?? []).map(toSpaceSummary),
+                total: data?.totalCount ?? 0,
+                page: data?.page ?? page,
+                pageSize: data?.pageSize ?? pageSize,
+            };
+        },
+        /** `GET /api/spaces/{id}` — the full (photo-less) layout graph for one space. */
+        async get(id: string): Promise<Space> {
+            const res = await client.api.spaces.byId(id).get();
+            if (!res?.data) throw new Error(`Space ${id} not found`);
+            return toSpace(res.data);
         },
         async create(space: Space): Promise<Space> {
             const res = await client.api.spaces.post(toDtoBody(space));

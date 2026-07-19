@@ -2,7 +2,7 @@
 id: B-16
 slug: slim-spaces-list
 title: Paginate/slim the spaces list; stop returning photo data-URLs inline (SC-3)
-status: requirements   # draft → requirements → tech-planning → in-progress → in-review → done | blocked
+status: in-review   # draft → requirements → tech-planning → in-progress → in-review → done | blocked
 depends-on: []         # B-13, B-14, B-15 have all landed; their conclusions are inherited below
 touch-points:
   - src/Tidansu.Application/Spaces/Queries/GetSpaces/GetSpacesQueryHandler.cs
@@ -112,24 +112,30 @@ it" is a hard acceptance criterion — and it must be **proven by driving**, not
   re-derive it.
 
 ## Acceptance criteria
-- [ ] `GET /api/spaces` no longer contains any photo base64 — verified against a real
+- [x] `GET /api/spaces` no longer contains any photo base64 — verified against a real
       response body for an account that has photo items (seed them via the API; the UI
       cannot create one).
-- [ ] 🪤 **A stored photo survives an item edit** made by a client that never received the
+- [x] 🪤 **A stored photo survives an item edit** made by a client that never received the
       photo — proven by driving (read an item, edit its name, confirm the photo is still in
       the DB). See the TRAP note below; this is the single highest-risk regression here.
-- [ ] Boot payload for the agreed heavy-account benchmark is bounded and small — **measured**
+- [x] Boot payload for the agreed heavy-account benchmark is bounded and small — **measured**
       before/after, not assumed.
 - [ ] The client no longer eagerly loads every space's full contents on boot (per-space
-      lazy-load), and the dashboard still renders correctly.
+      lazy-load), and the dashboard still renders correctly. **Lazy-load mechanism proven at
+      the API level** (GET /{id} is the only path that returns zones/items; the list never
+      does); **"the dashboard still renders correctly" not visually driven** — no browser
+      tooling available this pass.
 - [ ] The space list itself is paginated (FR-9) and the dashboard renders correctly across
-      the page boundary.
+      the page boundary. **Pagination mechanism proven** (deterministic, disjoint,
+      correct `totalCount`, correct clamp/400s); **"the dashboard renders correctly" not
+      visually driven** — no browser tooling available this pass.
 - [ ] A "still loading" state for a space's contents is visibly distinct from the genuine
-      empty state — a loading space must never look like an empty one (cf. B-18's bug).
-- [ ] Free/Pro plan gating is unchanged: no plan-cap path
+      empty state — a loading space must never look like an empty one (cf. B-18's bug). Purely
+      a UI/visual criterion — **not driven**, no browser tooling available this pass.
+- [x] Free/Pro plan gating is unchanged: no plan-cap path
       (`spaces`/`zones`/`items`/`photos`/`sync`) regresses. In particular the `photos` gate
       on item create/update still fires exactly as today.
-- [ ] No regression to B-15's granular zone/item endpoints or B-12's space-cap app-lock.
+- [x] No regression to B-15's granular zone/item endpoints or B-12's space-cap app-lock.
 
 **Explicitly NOT acceptance criteria for B-16** (moved to B-1 with the photo feature): a photo
 being *displayed*, a photo being *uploaded* from the UI, owner-only *fetching* of photo bytes,
@@ -137,6 +143,239 @@ and the safe-delivery/`nosniff` requirement — none of which can be met while n
 endpoint exists.
 
 ## Notes
+
+### Review follow-up: M1/N1/N2 fixed (2026-07-19)
+
+Applied the three `review.md` findings in the frontend per-space loading seam
+(`useSpacesStore.ts` + `SpaceView.vue`). M2/S-M1 were already fixed in an earlier pass and
+were not touched here. See `review.md`'s Action Checklist for the per-finding detail; summary:
+
+- **[M1] Deep-link/refresh to a page-2+ space no longer bounces to the dashboard.**
+  `loadSpaceContents(id)` now falls back to `api.get(id)` and inserts the result into
+  `spaces.value` when the id isn't among the loaded summary pages, returning
+  `'ok' | 'not-found' | 'error'`. `SpaceView`'s id-watch only redirects on a confirmed
+  `'not-found'` (a new `isNotFoundError` helper reads the Kiota error's
+  `responseStatusCode`). `hydrate()` now merges into `spaces.value` (keeping any
+  already-`contentsLoaded` space the new page doesn't include) rather than overwriting it,
+  so a concurrent boot-time `hydrate()` can't silently undo the fallback fetch. The normal
+  in-page navigation path (space already in the summary list) is unchanged — `loadSpaceContents`
+  still short-circuits to `'ok'` when `contentsLoaded` already has the id.
+- **[N1] A failed contents fetch no longer wedges an infinite spinner.** Added
+  `contentsFailed`/`isContentsFailed(id)` to the store (cleared at the start of every load
+  attempt, set on any non-404 failure). `SpaceView` derives `loadFailed` from it and renders a
+  `BaseEmptyState` ("Couldn't load this space" + a `BaseButton` "Retry" calling `onRetry`,
+  which just re-invokes `loadSpaceContents`) mutually exclusive with the loading state and the
+  genuine empty state (`isLoadingContents = !showContents && !loadFailed`).
+- **[N2] `duplicateSpace` no longer POSTs an empty copy on a failed fetch.** It now checks
+  `loadSpaceContents`'s result and returns `null` (aborts, no POST) unless it resolved `'ok'`.
+
+**Verification:** `npm run build` (vue-tsc + vite build) green; `npm run test` (vitest) 26/26
+green, unchanged. `dotnet build` unaffected (no backend files touched). **Not driven in a
+browser this pass** — no `mcp__claude-in-chrome__*` tool was present in this session's tool
+list, so the actual deep-link-to-page-2 flow, the error/retry UI, and the empty-duplicate abort
+could not be visually driven. Verified instead by full read-through of the resulting control
+flow (traced both the fast path — space already known, unchanged behaviour — and the fallback
+path — unknown id → `api.get` → push → reactive `space`/`showContents` update → `currentId`
+set via `lastKnownId` disambiguation, with no double-redirect on a route-id change to another
+unloaded space) against the store's and `SpaceView`'s existing conventions.
+
+### Driving verification (2026-07-19) — all boxes proven checked off, two left open (no browser tooling)
+
+Ran the full stack against a real LocalDB instance (`dotnet run` on `http://localhost:5081`,
+dev magic-link auth per the documented shortcut), with `EnableSensitiveDataLogging` +
+Serilog's `Microsoft.EntityFrameworkCore: Information` override surfacing every generated
+SQL statement. Seeded a Pro account (`pro-b16@tidansu.local`, upgraded via `DirectBillingService`
+— `StripeSettings.Enabled=false` in dev flips the plan instantly, no Stripe needed) and a Free
+account (`free-b16@tidansu.local`) via the API (the UI cannot create a photo).
+
+**Both build/test gates green:** `dotnet build` (whole solution, 0 warnings) and
+`dotnet test tests/Tidansu.Domain.Tests` (62/62 passing, unchanged — no new Domain rule).
+`npm run build` (vue-tsc + vite build) also green.
+
+**FR-1 — proven at the SQL level, not just JSON.** Seeded a Pro item with a genuine
+`data:image/png;base64,...` photo (real PNG magic-byte header + 1.5 MB filler — only the
+first 12 decoded bytes are sniffed by `PhotoPolicy`, so this is what `SpacePhotoGuard` actually
+validates). `GET /api/spaces` returned 305 bytes total (`itemCount`/`zoneCount`/
+`previewColors`, zero base64). `GET /api/spaces/{id}` returned 681 bytes with `"photo":null`
+on the item. Captured the **exact generated SQL** from the dev log for both:
+- Summaries query: `SELECT [s0].[Id], ..., [s0].[c], [s0].[c0], [z2].[Color], [z2].[Id] FROM (...
+  COUNT(*) subqueries for zones/items ...) LEFT JOIN (... top-6 zone colours by ROW_NUMBER ...)`
+  — **no `Item` table column beyond the `COUNT(*)`** appears in the SELECT list at all.
+- Detail query: `SELECT [s0].[Id], ..., [i].[Id], [i].[SpaceId], [i].[Name], [i].[ZoneId],
+  [i].[Quantity], [i].[Tags], [i].[DateAdded], [i].[Expiry], [i].[SlotIndex], [i].[Depth],
+  [i].[Level], [i].[Icon]` — every `Item` column is listed **except `[i].[Photo]`**. Confirmed
+  by name, not inference: the column is absent from the projection, so it never leaves SQL Server.
+
+**FR-3 / 🪤 — the headline, OBSERVED at the DB row level, both directions.** Simulated the
+SPA's exact round-trip: `GET /api/spaces/{id}` (photo comes back `null`) → `PUT` the same item
+back with a changed name and `photo: null` (what `toItemDtoBody` sends) → re-`GET` and
+**inspected the DB row directly via `sqlcmd`**:
+- Before: `LEN(Photo) = 2000022`, starts `data:image/png;base64,iVBORw0KGgoAAAA...`
+- After the `photo: null` PUT with a renamed item: **`LEN(Photo)` still `2000022`**, same PNG
+  header intact, `Name` = "Photo Item (renamed by client that never saw the photo)". The photo
+  survived, proven by direct DB inspection (not just the PUT's own response echo).
+- Inverse case: a Pro `PUT` with a genuine **non-null** photo (different size, 200 000 → then
+  100 000 raw bytes across two further edits) **did** replace the stored photo each time —
+  `sqlcmd` confirmed `LEN(Photo)` changed to match (266 690 chars, then a new create at
+  133 358 chars) — patch semantics only protects a `null` incoming photo, a real one still
+  updates normally.
+
+**FR-9 — real, measured before/after (not estimated).** Seeded the exact benchmark (3 spaces ×
+20 items × 1.5 MB raw photo each, ~90 MB of photo bytes, via 60 individual `POST .../items`
+calls, ~7 s total) on the Pro account. Rather than reason from an equivalent endpoint, did a
+**true before/after on the same account/DB**: `git stash push -u` reverted the entire B-16
+diff (backend + frontend + new untracked files) to the pre-B-16 tree, `dotnet build` (green,
+0 warnings) against the *unchanged* DB (no migration in this task), ran the old
+`GET /api/spaces`, measured, `Stop-Process` the old server, `git stash pop` (working tree back
+to the exact pre-stash state, confirmed via `git status`), rebuilt (green), reran the current
+`GET /api/spaces`:
+- **Before (pre-B-16 code, same account, same 90 MB of stored photos): 120,418,315 bytes**
+  (~114.9 MB) — response body contained 62 `base64,` occurrences (60 benchmark items + 2 from
+  earlier FR-1/FR-7 seeding on the same account).
+- **After (current B-16 code): 968 bytes** — 4 spaces, zero `base64,` occurrences.
+- The after-size is driven by space *count*, not photo count/size — confirmed by re-running the
+  same request after seeding (968 bytes both before and after the 60-item photo seed touched
+  this account, since the account already had a few spaces from earlier tests).
+
+**FR-7 — regression, driven, all six cases.** Free user: item **create** with a valid photo →
+`403 {"errors":{"plan":["photos"]}}`. Create with `photo:""` → **still 403, not 400** (proves
+the `is not null`-branch preserved B-13's gate-before-guard ordering — an `IsNullOrEmpty` branch
+would have let `""` skip straight to `SpacePhotoGuard`'s 400). Create with `photo:null` → 200
+(baseline). Update (existing no-photo item) with a valid photo → 403. Update with `photo:""` →
+403, not 400. Update with `photo:null` → 200 (patch-semantics no-op, allowed). Pro: create with a
+valid photo → 200, photo stored and length-verified (`133358` chars in the response, matching
+the 100 000-raw-byte input). Pro update with a valid (different) photo → 200, DB-verified replace
+(above). All six outcomes matched exactly.
+
+**FR-8 — regression, driven (not just spot-checked for caps).** Free user: 2nd space → 200 (at
+cap); 3rd space → `403 {"plan":["spaces"]}`. Zones: filled an existing space to 6 → 7th zone →
+`403 {"plan":["zones"]}`. Items: filled a space to 50 (49 sequential creates, 0 failures, 0.3 s)
+→ 51st → `403 {"plan":["items"]}`. **B-12 concurrent-add lock**: freed exactly one item slot
+(49/50) on the Free space, then fired 5 concurrent `POST .../items` via a `ThreadPoolExecutor` —
+exactly 1 succeeded (200), 4 got `403 {"plan":["items"]}`, final DB count was exactly 50 (never
+51+) — the per-space `sp_getapplock` still serialises correctly under real concurrency. **B-15
+granular endpoints**: `PUT .../zones/{zoneId}` (rename+recolour) → 200, applied; `POST
+.../items` + `DELETE .../items/{itemId}` → 200/204, item confirmed gone on re-`GET`. Zero drift
+on any of these.
+
+**IDOR spot-check on the two new read seams (Security section).** Free user's token against the
+Pro user's space id on `GET /api/spaces/{id}` → `404`, generic "doesn't exist" message, no graph
+leaked. The SQL log for both new queries shows the `WHERE ... [UserId] = @userId` (and
+`[Id] = @id AND [UserId] = @userId` for the detail read) parameterised inline — confirmed by
+inspection, not just behaviour. Confirmed `AsNoTracking()` is present on `GetLayoutByIdAsync`
+(`SpacesRepository.cs:119`); `GetSpaceSummariesPageAsync` projects straight into the `SpaceSummary`
+*record* (not an entity), which EF Core never tracks regardless — no explicit call needed there
+(matches the tech-plan's own note). The summaries query's zone-colour subquery was confirmed a
+**single round-trip** in the SQL log (one `SELECT` with a `ROW_NUMBER()`-windowed `LEFT JOIN`,
+not N+1 per space) — `pageSize` clamp confirmed (`pageSize=1000000` → 400; `page=0` → 400).
+
+**FR-6 — proven at the API level only; the UI "Load more" click was NOT driven.** Paged through
+the Pro account's 4 real spaces with `pageSize=1`: 4 distinct, non-overlapping ids across pages
+1–4, a consistent `totalCount:4` on every page, and an empty `items:[]` (still `totalCount:4`)
+on page 5 (beyond the end) — the underlying pagination contract (deterministic ordering, no
+overlap, no drop, correct total, graceful overrun) is solid. **Left the FR-6 tech-tasks.md box
+unchecked** because its literal wording ("the first page renders, 'Load more' fetches the rest")
+names a UI drive, and that piece was not performed — see below.
+
+**NOT driven — no browser tooling available in this environment.** No `mcp__claude-in-chrome__*`
+tool was present in this session's tool list, so the actual dashboard (`SpaceCard` rendering,
+counts/preview bands, the visually-distinct loading-vs-empty state on `SpaceView`, and the
+"Load more" button click) could **not** be visually driven. This mirrors the frontend batch's
+own note from the same day. Left the **FR-2/FR-4/FR-5** and **FR-6** `tech-tasks.md` boxes
+unchecked rather than asserting an unobserved visual result — everything at the API/DB/SQL-log
+level that those criteria depend on (summary payload shape, lazy per-space fetch on `GET /{id}`,
+pagination boundary correctness) was proven above and is consistent with what the UI code (already
+`vue-tsc`/`vitest`-green per the frontend batch) is wired to call.
+
+### Frontend batch implementation (2026-07-19)
+- **`Space.itemCount`/`zoneCount`/`previewColors` are plain fields kept in sync locally**,
+  not computeds — every store mutation that touches `zones`/`items`
+  (`addItemSmart/Structured`, `removeItem`, `addZoneColumn/Free`, `deleteZone`) now also calls a
+  new `refreshSummary(space)` (→ `summarize()` in `data/spaces.ts`), so a card's counts/preview
+  stay correct after an in-session edit, not just at initial load. `summarize()` is also used by
+  `seedFridge()`/`seedForType()`/`duplicateSpace()`/`toSpace()` so every `Space` constructor path
+  produces a consistent summary.
+- **`duplicateSpace` had to become `async`.** The dashboard can duplicate a space whose contents
+  were never opened (lazy-loaded, so `zones`/`items` are `[]`) — without first awaiting
+  `loadSpaceContents(id)`, the duplicate would silently come out empty. This wasn't an explicit
+  tech-task line item; it's a direct, necessary consequence of the lazy-load change on a touched
+  seam (`DashboardView.vue`'s `onDuplicate` updated to `void store.duplicateSpace(id)`).
+- **`store.count` now means the account-wide total** (`total.value` from the last page fetched),
+  not `spaces.value.length` (which is only the loaded-so-far count once paginated). This keeps
+  the Free space-cap check and the dashboard's "N spaces" subtitle correct across the page
+  boundary; `hasMoreSpaces` is the new `spaces.value.length < total.value` computed.
+- **Known gap surfaced, not fixed (out of the listed touch points): `AccountView.vue`'s
+  `totalItems`/`fullestSpace` usage stats compute client-side from `store.spaces.reduce(...,
+  s.items.length)`.** Post-B-16, that undercounts once a space is lazy — `items` stays `[]` until
+  the user has opened it in the session. This isn't new dead code B-16 introduced; it's an
+  existing client-side computation that this task's lazy-load makes inaccurate. The backend
+  already has what's needed to fix it properly — `GetAccountQueryHandler` returns an
+  `AccountDto.usage: UsageDto` (moved off `GetAllByUserAsync` back in B-14) — but the frontend's
+  `useAccountApi().get()` wrapper is defined and **never called anywhere today**. Wiring
+  `AccountView.vue` to that instead of `store.spaces` is a small, well-scoped fast-follow; flagged
+  here rather than silently pulled into this batch since `AccountView.vue` wasn't in the
+  dispatched touch-point list.
+- **`npm run build` (vue-tsc + vite build): green.** `npm run test` (vitest): 26/26 green — updated
+  `useSpacesStore.flush.test.ts`'s mock (`api.list` → `api.listPage`/`api.get`; `SPACES_QUERY_KEY`
+  → `spacesQueryKey`/`spaceContentsKey`) and `pendingChanges.test.ts`'s `makeSpace()` fixture
+  (added the three new required `Space` fields) to match the type change — no behavioural test
+  changes, both were type/API-surface follow-ups.
+- **Sanity drive performed (not the formal FR-1/3/9/6 drives — those are the next dispatch):**
+  ran the API + Vite dev servers, obtained a dev magic-link JWT, seeded a Pro account with a space
+  holding a photo item via the API, and confirmed live: `GET /api/spaces?page=1&pageSize=20`
+  returns `{items:[{...,zoneCount,itemCount,previewColors}], page, pageSize, totalCount}` with no
+  `zones`/`items`/photo bytes; `GET /api/spaces/{id}` returns the full graph with `photo: null` on
+  the item that was seeded with a real base64 photo. Browser tooling (Claude in Chrome) was not
+  connected in this environment, so the actual dashboard-card/loading-state/"Load more" UI could
+  not be visually driven this pass — confirmed instead via `vue-tsc`, `vite build`, `vitest`, and
+  forcing Vite to transform every touched module (200 OK, no compile errors in the dev-server log).
+
+### Backend batch implementation (2026-07-19)
+- **`GetLayoutByIdAsync` approach: entity-projection (the primary/preferred approach),
+  not the `SpaceLayout` fallback.** EF Core translated the nested-collection
+  `.Select(s => new Space { Zones = s.Zones.Select(z => new Zone {...}).ToList(),
+  Items = s.Items.Select(i => new Item {...omit Photo...}).ToList() })` projection
+  without complaint — `dotnet build` is green and the projection compiles/translates
+  cleanly. No fallback Domain read-model was needed.
+- **Photo column confirmed absent from both new SELECTs at the code level**:
+  `GetSpaceSummariesPageAsync`'s `Select` never references `Item.Photo` at all (only
+  `s.Zones.Count`/`s.Items.Count`/zone colours), and `GetLayoutByIdAsync`'s `Item`
+  projection lists every `Item` field except `Photo`, leaving it at its `null` default.
+  (SQL-level confirmation via the EF dev log is a frontend-batch/driving-verification
+  task, not re-proven here — see the FR-1 verification item in `tech-tasks.md`.)
+- `GetSpacesQueryValidator` follows the FluentValidation style of `ItemDtoValidator`;
+  `PagedResult<T>` lives at `src/Tidansu.Application/Common/PagedResult.cs` (first file
+  in that new `Common/` folder).
+- Kiota regeneration used the documented fallback (see agent memory
+  `kiota-regen-tooling`): `swagger tofile` fails against this repo's minimal-hosting
+  `Program.cs` (no `Startup` class), so the client was regenerated from a running,
+  DB-less instance's `/swagger/v1/swagger.json` instead of `npm run build:api-file`.
+  `npm run build:api-fix` / `build:api-client` / `build:api-patch` ran as documented.
+  Confirmed clean: `SpaceSummaryDto` and `SpaceSummaryDtoPagedResult` were generated,
+  `GET /api/spaces` now takes `page`/`pageSize` query params and returns
+  `SpaceSummaryDtoPagedResultApiOperationResult`. No hand-edits under `apiClient/`.
+- No EF migration created (none needed — no schema/model change).
+
+### Tech-planning decisions (2026-07-19) — see `tech-tasks.md`
+- **FR-3 mechanism CHOSEN: update given photo patch semantics** (`null` incoming `dto.Photo` =
+  leave stored photo unchanged; non-null = the existing gate/guard/set path) **+ a photo-less read
+  projection**. `ItemDto`/`SpaceDto` wire shapes are UNCHANGED — `ItemDto.Photo` stays for the
+  write path, the read just never populates it. Preferred over splitting read/write DTOs: the
+  shared shape becomes safe once the handler stops blind-assigning `item.Photo`, and it preserves
+  B-13's gate ordering incl. the empty-string-is-a-photo rule (branch on `is not null`, never
+  `IsNullOrEmpty`). **Accepted consequence handed to B-1:** photo can no longer be *cleared* via
+  update (inert — no UI clears one today).
+- **Read seam split (realises the B-14 deepening):** remove single-caller `GetAllByUserAsync`;
+  add `GetSpaceSummariesPageAsync` (paginated summary projection — no items/photos) for the list
+  and `GetLayoutByIdAsync` (photo-less full graph, `AsNoTracking`) for `GET /{id}`. `GetByIdAsync`
+  stays tracked + photo-bearing for `DeleteSpaceCommandHandler`'s cascade.
+- **Contract change → Kiota regen:** only `GET /api/spaces` changes shape (now paged
+  `SpaceSummaryDto`). `GET /{id}` shape is identical (photo just null). **No EF migration** — no
+  schema change; photo storage stays in `Item.Photo`.
+- **FR-6 page size PROPOSED (needs gate nod):** offset pagination, `pageSize = 20`, clamp `1..100`,
+  `TotalCount` returned, "Load more" UX.
+- **Deferred, do not fold in:** `DeleteSpaceCommandHandler` still loads photos via `GetByIdAsync`
+  to cascade — a residual SC-3-adjacent cost, but a separate set-based-delete change (out of scope).
 
 ### Requirements-stage findings (2026-07-16)
 - **The dashboard already needs only a per-space summary, not item content.**

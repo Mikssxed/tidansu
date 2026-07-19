@@ -94,12 +94,14 @@
 
     const typeDef = computed(() => spaceTypeDef(props.space.type));
     const openLabel = computed(() => `Open ${props.space.name}`);
+    // Driven by the dashboard-summary fields (B-16) — `zones`/`items` stay empty
+    // until the space is opened, so the counts/preview must not read those arrays.
     const previewBands = computed(() =>
-        props.space.zones.slice(0, 6).map((z) => ({ id: z.id, class: zoneBgClasses[z.color] }))
+        props.space.previewColors.map((color, i) => ({ id: `${props.space.id}-${i}`, class: zoneBgClasses[color] }))
     );
     const countsLabel = computed(() => {
-        const items = props.space.items.length;
-        const zones = props.space.zones.length;
+        const items = props.space.itemCount;
+        const zones = props.space.zoneCount;
         return `${items} ${items === 1 ? 'item' : 'items'} · ${zones} ${zones === 1 ? 'zone' : 'zones'}`;
     });
 

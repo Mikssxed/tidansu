@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Tidansu.Application.Common;
 using Tidansu.Application.Spaces.Commands.CreateSpace;
 using Tidansu.Application.Spaces.Commands.DeleteSpace;
 using Tidansu.Application.Spaces.Commands.UpdateSpaceFields;
@@ -17,12 +18,13 @@ namespace Tidansu.API.Controllers;
 [Authorize]
 public class SpacesController(IMediator mediator) : ControllerBase
 {
-    /// <summary>All spaces (with zones + items) for the current user.</summary>
+    /// <summary>A page of the current user's space summaries — no zones, items or photos.</summary>
     [HttpGet]
-    [ProducesResponseType<ApiOperationResult<List<SpaceDto>>>(StatusCodes.Status200OK)]
-    public async Task<Ok<ApiOperationResult<List<SpaceDto>>>> GetSpaces()
+    [ProducesResponseType<ApiOperationResult<PagedResult<SpaceSummaryDto>>>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    public async Task<Ok<ApiOperationResult<PagedResult<SpaceSummaryDto>>>> GetSpaces([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var result = await mediator.Send(new GetSpacesQuery());
+        var result = await mediator.Send(new GetSpacesQuery { Page = page, PageSize = pageSize });
         return ApiOperationResult.Ok(result);
     }
 

@@ -13,7 +13,9 @@ public class GetSpaceQueryHandler(
     public async Task<SpaceDto> Handle(GetSpaceQuery request, CancellationToken cancellationToken)
     {
         var userId = userContext.GetCurrentUser().Id;
-        var space = await spaces.GetByIdAsync(request.Id, userId, cancellationToken)
+        // Photo-less full graph (B-16 / SC-3) — GetByIdAsync stays tracked +
+        // photo-bearing for DeleteSpaceCommandHandler's cascade only.
+        var space = await spaces.GetLayoutByIdAsync(request.Id, userId, cancellationToken)
             ?? throw new NotFoundException("Space", request.Id);
         return SpaceDto.FromEntity(space);
     }

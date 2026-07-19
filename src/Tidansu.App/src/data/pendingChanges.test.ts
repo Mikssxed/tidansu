@@ -59,6 +59,9 @@ function makeSpace(overrides: Partial<Space> = {}): Space {
         columnLabels: null,
         zones: [],
         items: [],
+        itemCount: 0,
+        zoneCount: 0,
+        previewColors: [],
         ...overrides,
     };
 }

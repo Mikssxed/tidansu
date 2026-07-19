@@ -15,7 +15,8 @@ import { createPinia, setActivePinia } from 'pinia';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = {
-    list: vi.fn(async () => []),
+    listPage: vi.fn(async () => ({ spaces: [], total: 0, page: 1, pageSize: 20 })),
+    get: vi.fn(async () => undefined),
     create: vi.fn(async () => undefined),
     remove: vi.fn(async () => undefined),
     updateFields: vi.fn(async () => undefined),
@@ -40,7 +41,8 @@ vi.mock('@/composables/useSpacesApi', () => ({
 }));
 vi.mock('@/queryClient', () => ({
     queryClient: { fetchQuery: vi.fn(), setQueryData: vi.fn(), removeQueries: vi.fn() },
-    SPACES_QUERY_KEY: ['spaces'],
+    spacesQueryKey: (page: number) => ['spaces', page],
+    spaceContentsKey: (id: string) => ['space', id],
 }));
 // Partial mock: the real pure module is used throughout, but `applyRollback` is spyable
 // so T-34.12c can force an unexpected throw from inside the flush.
@@ -98,7 +100,7 @@ describe('B-15 store flush orchestration', () => {
         expect(space.items.find((i) => i.name === 'Butter')).toBeUndefined();
         // ...but the sibling rename is NOT re-fetched away (the old hydrate(true) bug)
         expect(space.items.find((i) => i.id === 'item_a')!.name).toBe('Oat milk');
-        expect(api.list).not.toHaveBeenCalled();
+        expect(api.listPage).not.toHaveBeenCalled();
     });
 
     // ---- T-34.11 · BUG 1 — the phase-2 drop rule ----------------------------------
@@ -156,7 +158,7 @@ describe('B-15 store flush orchestration', () => {
 
         expect(openPaywall).toHaveBeenCalledWith('spaces');
         expect(store.spaces.find((s) => s.id === 'space_2')).toBeUndefined(); // B rolled back
-        expect(api.list).not.toHaveBeenCalled();                              // no re-sync
+        expect(api.listPage).not.toHaveBeenCalled();                              // no re-sync
 
         await vi.advanceTimersByTimeAsync(DEBOUNCE);
         await vi.runAllTimersAsync();

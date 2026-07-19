@@ -1,5 +1,5 @@
 import { inDays } from '@/data/dates';
-import { buildZones, uid } from '@/data/spaces';
+import { buildZones, summarize, uid } from '@/data/spaces';
 import type { Item, Space } from '@/data/types';
 
 /** Starter space seeded on first sign-in — ported from seedFridge() in data.jsx. */
@@ -63,5 +63,6 @@ export function seedFridge(): Space {
         columnLabels: null,
         zones,
         items,
+        ...summarize(zones, items),
     };
 }

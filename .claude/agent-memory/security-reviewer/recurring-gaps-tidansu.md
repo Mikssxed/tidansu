@@ -31,6 +31,11 @@ have been in what the checklist doesn't name.
   `PUT /api/spaces/{id}/fields` replaced a `PUT` that had a 24 MB limit and shipped with
   none (→ Kestrel's ~28.6 MB default, i.e. a *larger* ceiling than what it replaced). When a
   route is retired in favour of new ones, diff the attributes, not just the handler.
+- **Paging validators clamp `PageSize` but leave `Page` unbounded.** `GetSpacesQueryValidator`
+  caps `PageSize` to 1..100 (the DoS guard everyone credits) but bounds `Page` only with
+  `>= 1`. `skip = (Page - 1) * PageSize` is unchecked `int` arithmetic, so a large `Page`
+  overflows to a negative `OFFSET` → SQL error → 500. Filed S-M1 in B-16's `review.md`
+  (2026-07-19). On any new paged endpoint: bound BOTH page params and treat `skip` as `long`.
 - **Generic-catch 500s are an information oracle.** `ErrorHandlingMiddleware`'s catch-all
   returns a flat "Something went wrong." with no detail (good), but the *status* still
   distinguishes "DB constraint hit" from "success". Where a constraint encodes cross-tenant

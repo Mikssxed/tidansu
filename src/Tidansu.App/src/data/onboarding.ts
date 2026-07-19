@@ -1,4 +1,4 @@
-import { applyComplexity, buildZones, type Complexity } from '@/data/spaces';
+import { applyComplexity, buildZones, summarize, type Complexity } from '@/data/spaces';
 import { seedFridge } from '@/data/seed';
 import { uid } from '@/data/spaces';
 import type { Space, SpaceTypeId } from '@/data/types';
@@ -54,6 +54,8 @@ export function seedForType(type: SpaceTypeId, name: string, complexity: Complex
         space = seedFridge();
         space.name = name;
     } else {
+        const zones = buildZones(type);
+        const items: Space['items'] = [];
         space = {
             id: uid('space'),
             name,
@@ -62,8 +64,9 @@ export function seedForType(type: SpaceTypeId, name: string, complexity: Complex
             canvasMode: 'columns',
             layoutColumns: 1,
             columnLabels: null,
-            zones: buildZones(type),
-            items: [],
+            zones,
+            items,
+            ...summarize(zones, items),
         };
     }
     applyComplexity(space, complexity);

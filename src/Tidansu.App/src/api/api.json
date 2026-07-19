@@ -812,23 +812,63 @@
         "tags": [
           "Spaces"
         ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpaceDtoListApiOperationResult"
+                  "$ref": "#/components/schemas/SpaceSummaryDtoPagedResultApiOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpaceDtoListApiOperationResult"
+                  "$ref": "#/components/schemas/SpaceSummaryDtoPagedResultApiOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpaceDtoListApiOperationResult"
+                  "$ref": "#/components/schemas/SpaceSummaryDtoPagedResultApiOperationResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
                 }
               }
             }
@@ -1118,6 +1158,26 @@
           },
           "404": {
             "description": "Not Found",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Content Too Large",
             "content": {
               "text/plain": {
                 "schema": {
@@ -1981,35 +2041,6 @@
           "isSuccess"
         ]
       },
-      "SpaceDtoListApiOperationResult": {
-        "type": "object",
-        "properties": {
-          "errors": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "isSuccess": {
-            "type": "boolean"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/SpaceDto"
-            },
-            "nullable": true
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "errors",
-          "isSuccess"
-        ]
-      },
       "SpaceFieldsDto": {
         "type": "object",
         "properties": {
@@ -2063,6 +2094,119 @@
           },
           "data": {
             "$ref": "#/components/schemas/SpaceFieldsDto"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "errors",
+          "isSuccess"
+        ]
+      },
+      "SpaceSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "viewMode": {
+            "type": "string"
+          },
+          "canvasMode": {
+            "type": "string"
+          },
+          "layoutColumns": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "columnLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "zoneCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "itemCount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "previewColors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "canvasMode",
+          "id",
+          "itemCount",
+          "layoutColumns",
+          "name",
+          "previewColors",
+          "type",
+          "viewMode",
+          "zoneCount"
+        ]
+      },
+      "SpaceSummaryDtoPagedResult": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SpaceSummaryDto"
+            }
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "totalCount": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "page",
+          "pageSize",
+          "totalCount"
+        ]
+      },
+      "SpaceSummaryDtoPagedResultApiOperationResult": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "isSuccess": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SpaceSummaryDtoPagedResult"
           }
         },
         "additionalProperties": false,

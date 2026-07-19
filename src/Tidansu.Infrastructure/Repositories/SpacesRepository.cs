@@ -11,14 +11,6 @@ namespace Tidansu.Infrastructure.Repositories;
 
 public class SpacesRepository(TidansuDbContext dbContext, ILogger<SpacesRepository> logger) : ISpacesRepository
 {
-    public Task<List<Space>> GetAllByUserAsync(string userId, CancellationToken cancellationToken = default)
-        => dbContext.Spaces
-            .Where(s => s.UserId == userId)
-            .Include(s => s.Zones)
-            .Include(s => s.Items)
-            .AsSplitQuery()
-            .ToListAsync(cancellationToken);
-
     public Task<Space?> GetByIdAsync(string id, string userId, CancellationToken cancellationToken = default)
         => dbContext.Spaces
             .Where(s => s.Id == id && s.UserId == userId)
@@ -40,6 +32,92 @@ public class SpacesRepository(TidansuDbContext dbContext, ILogger<SpacesReposito
             .Where(s => s.UserId == userId)
             .Select(s => s.Items.Count)
             .ToListAsync(cancellationToken);
+
+    // The list page (B-16 / SC-3) only needs card-summary columns + counts + up to 6
+    // zone colours — the full graph (former GetAllByUserAsync) carried every zone and
+    // item, including each item's nvarchar(max) photo data-URL, for the whole account
+    // at once. This projects straight to SpaceSummary so no item/photo column ever
+    // leaves SQL, and pages server-side rather than loading everything into memory
+    // first. Do not "simplify" this back into a .Include(Zones).Include(Items) graph
+    // plus in-memory Skip/Take/mapping (B-8 SC-1/SC-3). Ordered by the stable Id key
+    // so paging is deterministic across requests.
+    public Task<List<SpaceSummary>> GetSpaceSummariesPageAsync(string userId, int skip, int take, CancellationToken cancellationToken = default)
+        => dbContext.Spaces
+            .Where(s => s.UserId == userId)
+            .OrderBy(s => s.Id)
+            .Skip(skip)
+            .Take(take)
+            .Select(s => new SpaceSummary(
+                s.Id,
+                s.Name,
+                s.Type,
+                s.ViewMode,
+                s.CanvasMode,
+                s.LayoutColumns,
+                s.ColumnLabels,
+                s.Zones.Count,
+                s.Items.Count,
+                s.Zones.OrderBy(z => z.Position).Take(6).Select(z => z.Color).ToList()))
+            .ToListAsync(cancellationToken);
+
+    // The read-only, photo-less full graph for one space (B-16 / SC-3): projects into
+    // entity instances that leave Item.Photo unset (null), so the nvarchar(max) column
+    // is never referenced in the SELECT and never leaves SQL. AsNoTracking — this feeds
+    // DTO mapping only, never a mutate path. Distinct from GetByIdAsync, which stays
+    // tracked + photo-bearing for DeleteSpaceCommandHandler's cascade — do not merge them.
+    public Task<Space?> GetLayoutByIdAsync(string id, string userId, CancellationToken cancellationToken = default)
+        => dbContext.Spaces
+            .Where(s => s.Id == id && s.UserId == userId)
+            .Select(s => new Space
+            {
+                Id = s.Id,
+                UserId = s.UserId,
+                Name = s.Name,
+                Type = s.Type,
+                ViewMode = s.ViewMode,
+                CanvasMode = s.CanvasMode,
+                LayoutColumns = s.LayoutColumns,
+                ColumnLabels = s.ColumnLabels,
+                Zones = s.Zones.OrderBy(z => z.Position).Select(z => new Zone
+                {
+                    Id = z.Id,
+                    SpaceId = z.SpaceId,
+                    Position = z.Position,
+                    Label = z.Label,
+                    Color = z.Color,
+                    GridCols = z.GridCols,
+                    GridRows = z.GridRows,
+                    HasDepth = z.HasDepth,
+                    Floor = z.Floor,
+                    Kind = z.Kind,
+                    Facing = z.Facing,
+                    Levels = z.Levels,
+                    Column = z.Column,
+                    RectX = z.RectX,
+                    RectY = z.RectY,
+                    RectW = z.RectW,
+                    RectH = z.RectH,
+                }).ToList(),
+                // Photo is deliberately never referenced here (SC-3) — every other
+                // field is projected, leaving Photo at its default (null).
+                Items = s.Items.Select(i => new Item
+                {
+                    Id = i.Id,
+                    SpaceId = i.SpaceId,
+                    Name = i.Name,
+                    ZoneId = i.ZoneId,
+                    Quantity = i.Quantity,
+                    Tags = i.Tags,
+                    DateAdded = i.DateAdded,
+                    Expiry = i.Expiry,
+                    SlotIndex = i.SlotIndex,
+                    Depth = i.Depth,
+                    Level = i.Level,
+                    Icon = i.Icon,
+                }).ToList(),
+            })
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken);
 
     public async Task AddAsync(Space space, CancellationToken cancellationToken = default)
     {

@@ -255,9 +255,12 @@
     });
 
     const spaceCount = computed(() => store.count);
-    const totalItems = computed(() => store.spaces.reduce((n, s) => n + s.items.length, 0));
+    // Post-B-16 spaces are lazy-loaded, so `s.items` is empty until a space is
+    // opened — read the summary's `itemCount` (kept in sync via refreshSummary)
+    // so usage meters stay accurate for every loaded space (FR-2).
+    const totalItems = computed(() => store.spaces.reduce((n, s) => n + s.itemCount, 0));
     const fullestSpace = computed(() =>
-        store.spaces.reduce((max, s) => Math.max(max, s.items.length), 0)
+        store.spaces.reduce((max, s) => Math.max(max, s.itemCount), 0)
     );
     const itemsCap = computed(() =>
         isInf(caps.value.items) ? Infinity : caps.value.items * Math.max(1, store.count)

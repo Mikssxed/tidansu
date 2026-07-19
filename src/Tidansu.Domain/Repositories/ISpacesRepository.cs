@@ -4,9 +4,29 @@ namespace Tidansu.Domain.Repositories;
 
 public interface ISpacesRepository
 {
-    Task<List<Space>> GetAllByUserAsync(string userId, CancellationToken cancellationToken = default);
     Task<Space?> GetByIdAsync(string id, string userId, CancellationToken cancellationToken = default);
     Task<int> CountByUserAsync(string userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// A page of the user's spaces, projected to list-card summary columns only — no
+    /// zones, items, or photo payloads (B-16 / SC-3). Ordered by the stable key
+    /// <c>Id</c> before <c>Skip/Take</c> so paging is deterministic across requests.
+    /// Do not "simplify" this back into <see cref="GetByIdAsync"/>-style graph loads
+    /// plus in-memory paging/mapping — that reintroduces the whole-account payload
+    /// this method exists to remove.
+    /// </summary>
+    Task<List<SpaceSummary>> GetSpaceSummariesPageAsync(string userId, int skip, int take, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// The read-only, photo-less full graph (zones + items) for one owner-scoped
+    /// space — every item's <c>Photo</c> is left <c>null</c>, so the column never
+    /// leaves SQL (B-16 / SC-3). <c>AsNoTracking</c>. Distinct from
+    /// <see cref="GetByIdAsync"/>, which stays tracked and photo-bearing for
+    /// <c>DeleteSpaceCommandHandler</c>'s cascade — do not merge the two.
+    /// <c>null</c> when the space does not exist or is not owned by
+    /// <paramref name="userId"/>.
+    /// </summary>
+    Task<Space?> GetLayoutByIdAsync(string id, string userId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Returns one element per space owned by the user, each the item count of that

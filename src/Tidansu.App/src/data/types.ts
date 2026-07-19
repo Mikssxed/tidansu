@@ -67,6 +67,12 @@ export interface Space {
     canvasMode: CanvasMode;
     layoutColumns: number;
     columnLabels: string[] | null;
+    /** Full zone/item graph — empty until the space is opened (lazy-loaded, B-16). */
     zones: Zone[];
     items: Item[];
+    /** Dashboard-summary counts; carried by the list read and kept in sync locally. */
+    itemCount: number;
+    zoneCount: number;
+    /** First (up to) 6 zone colours, ordered by position — dashboard preview bands. */
+    previewColors: ZoneColor[];
 }

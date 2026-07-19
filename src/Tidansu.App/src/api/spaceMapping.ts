@@ -1,5 +1,6 @@
-import type { ItemDto, SpaceDto, SpaceFieldsDto, ZoneDto } from '@/api/apiClient/models';
+import type { ItemDto, SpaceDto, SpaceFieldsDto, SpaceSummaryDto, ZoneDto } from '@/api/apiClient/models';
 import type { IconName } from '@/components/icons';
+import { summarize } from '@/data/spaces';
 import type {
     CanvasMode,
     Item,
@@ -20,6 +21,8 @@ import type {
  * round-trips as null for columns-mode zones.
  */
 export function toSpace(dto: SpaceDto): Space {
+    const zones = (dto.zones ?? []).map(toZone);
+    const items = (dto.items ?? []).map(toItem);
     return {
         id: dto.id,
         name: dto.name,
@@ -28,8 +31,33 @@ export function toSpace(dto: SpaceDto): Space {
         canvasMode: dto.canvasMode as CanvasMode,
         layoutColumns: dto.layoutColumns,
         columnLabels: dto.columnLabels ?? null,
-        zones: (dto.zones ?? []).map(toZone),
-        items: (dto.items ?? []).map(toItem),
+        zones,
+        items,
+        // The full-graph DTO carries no summary fields — derive them from the
+        // graph that just arrived, same shape the server's summary projects.
+        ...summarize(zones, items),
+    };
+}
+
+/**
+ * Maps the paginated list read (`GET /api/spaces`) — a `SpaceSummaryDto` carries no
+ * `zones`/`items` (B-16 SC-3: the list never ships item/photo payloads), so those
+ * stay empty until `SpaceView` opens the space and lazy-loads its full contents.
+ */
+export function toSpaceSummary(dto: SpaceSummaryDto): Space {
+    return {
+        id: dto.id,
+        name: dto.name,
+        type: dto.type as SpaceTypeId,
+        viewMode: dto.viewMode as ViewMode,
+        canvasMode: dto.canvasMode as CanvasMode,
+        layoutColumns: dto.layoutColumns,
+        columnLabels: dto.columnLabels ?? null,
+        zones: [],
+        items: [],
+        itemCount: dto.itemCount,
+        zoneCount: dto.zoneCount,
+        previewColors: (dto.previewColors ?? []) as ZoneColor[],
     };
 }
 

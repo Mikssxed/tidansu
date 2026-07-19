@@ -11,5 +11,8 @@ export const queryClient = new QueryClient({
     },
 });
 
-export const SPACES_QUERY_KEY = ['spaces'] as const;
+/** Page-scoped key for a spaces-summary page (`GET /api/spaces?page=`). */
+export const spacesQueryKey = (page: number) => ['spaces', page] as const;
+/** Key for one space's full (photo-less) contents graph (`GET /api/spaces/{id}`). */
+export const spaceContentsKey = (id: string) => ['space', id] as const;
 export const PLANS_QUERY_KEY = ['plans'] as const;

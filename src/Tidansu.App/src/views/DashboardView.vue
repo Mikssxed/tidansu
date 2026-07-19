@@ -95,6 +95,19 @@
             </button>
         </div>
 
+        <!-- Load more (B-16 FR-6 — the spaces list is paginated) -->
+        <div
+            v-if="store.hasMoreSpaces"
+            class="mt-6 flex justify-center"
+        >
+            <BaseButton
+                variant="secondary"
+                @click="onLoadMore"
+            >
+                Load more
+            </BaseButton>
+        </div>
+
         <SpaceRenameModal
             :open="isRenameOpen"
             :initial-name="renameInitialName"
@@ -156,7 +169,9 @@
     const renameInitialName = computed(() => renameTarget.value?.name ?? '');
     const isDeleteOpen = computed(() => deleteTarget.value !== null);
     const deleteName = computed(() => deleteTarget.value?.name ?? '');
-    const deleteItemCount = computed(() => deleteTarget.value?.items.length ?? 0);
+    // The delete modal must never force-load a space's contents just to show a count —
+    // `itemCount` is the dashboard-summary field, accurate whether or not it's opened.
+    const deleteItemCount = computed(() => deleteTarget.value?.itemCount ?? 0);
 
     function goCreate() {
         if (!limits.guard(limits.checkAddSpace())) return;
@@ -178,7 +193,11 @@
 
     function onDuplicate(id: string) {
         if (!limits.guard(limits.checkAddSpace())) return;
-        store.duplicateSpace(id);
+        void store.duplicateSpace(id);
+    }
+
+    function onLoadMore() {
+        void store.loadMoreSpaces();
     }
 
     function onDelete(id: string) {

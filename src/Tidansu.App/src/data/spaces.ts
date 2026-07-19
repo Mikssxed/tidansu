@@ -1,5 +1,5 @@
 import type { IconName } from '@/components/icons';
-import type { CanvasMode, Rect, Space, SpaceTypeId, Zone, ZoneColor, ZoneKind } from '@/data/types';
+import type { CanvasMode, Item, Rect, Space, SpaceTypeId, Zone, ZoneColor, ZoneKind } from '@/data/types';
 
 export const ZONE_COLORS: ZoneColor[] = ['blue', 'green', 'amber', 'pink', 'gray'];
 
@@ -83,6 +83,25 @@ export function makeZone(opts: {
         levels: 1,
         column: opts.column ?? 0,
         rect: opts.rect ?? null,
+    };
+}
+
+/**
+ * Derive the dashboard-summary fields (B-16) from a live zone/item graph — used
+ * wherever a `Space` is built or edited client-side (seeding, duplication, local
+ * mutations), mirroring what the server's `SpaceSummaryDto` projects.
+ */
+export function summarize(
+    zones: Zone[],
+    items: Item[]
+): Pick<Space, 'itemCount' | 'zoneCount' | 'previewColors'> {
+    return {
+        itemCount: items.length,
+        zoneCount: zones.length,
+        previewColors: [...zones]
+            .sort((a, b) => a.position - b.position)
+            .slice(0, 6)
+            .map((z) => z.color),
     };
 }
 
