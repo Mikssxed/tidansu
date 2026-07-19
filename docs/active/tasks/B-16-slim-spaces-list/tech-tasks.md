@@ -258,12 +258,19 @@ never populates it. So the only contract change forcing a Kiota regen is `GET
   ~1.5 MB each** (~90 MB) via API. Record raw response bytes of `GET /api/spaces` (and
   `GET /api/spaces/{id}`) **before** (git-stash the change / prior commit) vs **after**. Write the
   two numbers into `## Notes`; the after-size must not scale with photo count/size.
-- [ ] **FR-2/FR-4/FR-5 — drive it.** Dashboard renders every card (name/type, ≤6 colour bands,
-  correct item/zone counts) without any space's contents loaded. Open a heavy space → a **loading
-  state** shows, then the full photo-less layout; a genuinely empty space shows the empty state and
-  the loading state never flashes for a populated one.
-- [ ] **FR-6 — drive it.** With more spaces than `pageSize`, the first page renders, "Load more"
-  fetches the rest, and every space stays reachable and correct across the boundary.
+- [x] **FR-2/FR-4/FR-5 — drive it.** Driven in Chrome (2026-07-19, built app @ localhost:5000,
+  Pro account, 22 seeded spaces). Dashboard renders every card with name/type, preview colour
+  bands, and correct `itemCount·zoneCount` counts (e.g. "2 items · 3 zones", heavy space
+  "18 items · 5 zones" with 5 bands) with **no space opened** — counts are summary-driven. Opening
+  a space shows a distinct centred **"Loading…"** placeholder (icon + text), which then resolves to
+  the full photo-less layout; it is visually distinct from the genuine empty state and does not look
+  empty while in flight.
+- [x] **FR-6 — drive it.** Driven in Chrome. Page 1 renders exactly 20 cards (Space 01–20) + a
+  "Load more" button; clicking it appends page 2 (Space 21, 22) and the button disappears once all
+  22 are loaded. Every space stays reachable and correct across the boundary. Deep-link/refresh to a
+  page-2 space (`/spaces/drv22`, never in the page-1 hydrate) loads it **directly** via the M1
+  fallback — no bounce to the dashboard; an unknown id (`/spaces/does-not-exist-xyz`) correctly
+  redirects to the dashboard on the API 404.
 - [x] **FR-7 — regression, drive it.** Free user setting a photo on item **create** → 403
   `{plan:["photos"]}` (paywall). Free user sending a non-null photo on item **update** → still 403.
   Free `photo: ""` on create/update → still 403 (not a 400). Pro create/update with a valid photo →

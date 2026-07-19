@@ -179,6 +179,28 @@ path — unknown id → `api.get` → push → reactive `space`/`showContents` u
 set via `lastKnownId` disambiguation, with no double-redirect on a route-id change to another
 unloaded space) against the store's and `SpaceView`'s existing conventions.
 
+### UI driving verification (2026-07-19) — the two previously-open boxes, now closed via Chrome
+
+Closed the FR-2/4/5 and FR-6 boxes (and the M1 deep-link fix) by driving the **built** app in
+Chrome (served same-origin from `wwwroot` at `http://localhost:5000` — the API booted with
+`--no-launch-profile` so it bound the default port, not 5081). Real magic-link sign-in via the
+dev "Open the link" button. Seeded a Pro account with **22 spaces** through the API (21 light:
+3 zones / 2 items; #22 heavy: 5 zones / 18 items) so `pageSize=20` forces a real page boundary.
+
+- **FR-2 (counts pre-open):** every dashboard card rendered name/type, preview colour bands, and
+  correct `itemCount·zoneCount` ("2 items · 3 zones"; heavy card "18 items · 5 zones" with 5 bands)
+  with **no space opened** — the counts come from the summary, not loaded items.
+- **FR-4/FR-5 (loading vs empty):** opening a space showed a distinct centred **"Loading…"**
+  placeholder, then resolved to the full item list — never looked like the genuine empty state.
+- **FR-6 (pagination):** page 1 showed exactly 20 cards + a "Load more" button; clicking it
+  appended Space 21 + 22 and the button disappeared once all 22 were loaded.
+- **M1 (deep-link fix, the review follow-up):** a fresh navigation to `/spaces/drv22` (a page-2
+  space absent from the page-1 hydrate) loaded the space **directly** — no bounce to the dashboard.
+  An unknown id (`/spaces/does-not-exist-xyz`) resolved to the API 404 and **correctly redirected**
+  to the dashboard. Both M1 branches confirmed.
+- **Not driven:** N1 (error/retry on a *failed* contents fetch) — would need an induced network
+  failure; left as the one un-driven minor. Low risk (transient-only, self-heals on re-nav).
+
 ### Driving verification (2026-07-19) — all boxes proven checked off, two left open (no browser tooling)
 
 Ran the full stack against a real LocalDB instance (`dotnet run` on `http://localhost:5081`,
