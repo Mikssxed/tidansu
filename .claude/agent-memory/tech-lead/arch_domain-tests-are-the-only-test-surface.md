@@ -1,14 +1,25 @@
 ---
 name: arch-domain-tests-are-the-only-test-surface
-description: tests/Tidansu.Domain.Tests is the repo's ONLY automated test project — pure business rules belong in Domain/Constants (PlanPolicy pattern) so they become testable
+description: Two test surfaces — tests/Tidansu.Domain.Tests (xUnit, backend) and a frontend vitest suite (npm test); pure business rules belong in Domain/Constants (PlanPolicy pattern) so they become testable
 metadata:
   type: project
 ---
 
-`tests/Tidansu.Domain.Tests` (xUnit, references Domain only) is the **single**
-automated test project in this repo. There is no Application/API/frontend test
-suite; everything else is verified by `dotnet build` + `npm run build` + driving
-the app by hand.
+**Corrected 2026-07-20 (B-18): there are TWO test surfaces, not one.**
+
+1. `tests/Tidansu.Domain.Tests` (xUnit, references Domain only) — the sole *backend*
+   test project. No Application/API/integration/E2E suite exists.
+2. **The frontend has a vitest surface**: `npm test` → `vitest run` from
+   `src/Tidansu.App`, with `src/stores/useSpacesStore.flush.test.ts` as the exemplar
+   (mocks `useApiClient` / `useSpacesApi` / `useLimits` / `@/queryClient` at the module
+   boundary, drives the Pinia store directly via `setActivePinia(createPinia())`).
+   I previously recorded this as non-existent — wrong; don't plan around that again.
+
+**When to plan a frontend vitest file** (it is the exception, not the default —
+everything else is still `npm run build` + a manual drive): the criterion is
+data-integrity shaped *and* depends on a timing/rejection interleaving that a browser
+drive can't hit reliably. Precedents: B-15's debounce/flush ordering; B-18's "a failed
+hydrate must not seed a phantom starter fridge."
 
 **Why:** this makes "where does a pure business rule live?" a testability decision,
 not just a layering one. A rule expressed as a FluentValidation lambda in

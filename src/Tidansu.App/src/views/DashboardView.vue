@@ -14,7 +14,10 @@
                         :cap="session.caps.spaces"
                     />
                 </div>
-                <BaseButton @click="goCreate">
+                <BaseButton
+                    :disabled="isCreateDisabled"
+                    @click="goCreate"
+                >
                     <BaseIcon
                         name="plus"
                         :size="18"
@@ -52,9 +55,40 @@
             </BaseButton>
         </div>
 
+        <!-- Initial spaces fetch still loading (B-18 U-2) — must never be mistaken for the empty state -->
+        <div
+            v-if="isLoadingSpaces"
+            class="mt-10 flex flex-col items-center py-10 text-center"
+        >
+            <BaseIcon
+                name="cabinet"
+                :size="28"
+                class="animate-pulse text-text-2"
+            />
+            <p class="mt-4 text-[14px] text-text-2">Loading…</p>
+        </div>
+
+        <!-- Initial spaces fetch failed — distinct from both loading and genuinely empty -->
+        <BaseEmptyState
+            v-else-if="loadFailed"
+            class="mt-10 rounded-card border border-border bg-surface"
+            icon="restart"
+            title="Couldn't load your spaces"
+            description="Something went wrong loading them. Check your connection and try again."
+        >
+            <template #action>
+                <BaseButton
+                    size="sm"
+                    @click="onRetry"
+                >
+                    Retry
+                </BaseButton>
+            </template>
+        </BaseEmptyState>
+
         <!-- Empty state -->
         <BaseEmptyState
-            v-if="store.count === 0"
+            v-else-if="showEmptyState"
             class="mt-10 rounded-card border border-border bg-surface"
             icon="cabinet"
             title="No spaces yet"
@@ -157,6 +191,23 @@
         () => !isInf(session.caps.spaces) && store.count >= session.caps.spaces
     );
 
+    // B-18 U-2: the initial account-wide spaces fetch must render as an explicit
+    // loading/failed state, distinct from the genuine "no spaces yet" empty state —
+    // otherwise a failed or in-flight fetch looks identical to a brand-new account and
+    // can trigger the starter-fridge seed. `'idle'` (VITE_DISABLE_AUTH dev bypass, where
+    // App.vue never calls hydrate) falls through to the grid's terminal `v-else` so
+    // that workflow stays usable instead of showing a permanent spinner.
+    const isLoadingSpaces = computed(() => store.isHydrating);
+    const loadFailed = computed(() => store.isHydrateFailed);
+    const showEmptyState = computed(() => store.hydrated && store.count === 0);
+    // The card grid is the terminal `v-else` branch in the template — not its own
+    // computed — so the four states stay a plain if/else-if chain with no negation to
+    // keep in sync (B-18 review N2): nothing can fall through to a blank render.
+    // UI availability guard only — creating a space while the fetch is pending/failed
+    // would run the Free cap check against unknown state. `limits.guard(limits.checkAddSpace())`
+    // in `goCreate`/`onDuplicate` remains the single cap enforcement; this never opens the paywall.
+    const isCreateDisabled = computed(() => isLoadingSpaces.value || loadFailed.value);
+
     // Fully-mapped v-for source (template-purity HARD RULE) — each card already
     // carries its own read-only flag, so the template never calls isSpaceReadOnly.
     const spaceCards = computed(() =>
@@ -181,6 +232,9 @@
     const deleteItemCount = computed(() => deleteTarget.value?.itemCount ?? 0);
 
     function goCreate() {
+        // B-18 backstop: never open the create flow while the initial fetch is pending
+        // or failed, even if the header button's disabled state is somehow bypassed.
+        if (isCreateDisabled.value) return;
         if (!limits.guard(limits.checkAddSpace())) return;
         router.push({ name: 'spacesNew' });
     }
@@ -208,6 +262,10 @@
 
     function onLoadMore() {
         void store.loadMoreSpaces();
+    }
+
+    function onRetry() {
+        void store.hydrate(true);
     }
 
     function onDelete(id: string) {

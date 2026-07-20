@@ -83,6 +83,15 @@ Read `AddZoneCommandHandler.cs` — it is the reference implementation. The orde
 - **Never hand-edit `src/api/apiClient/`** (a hook blocks it). After any API
   contract change: `dotnet build` the API → `npm run build:api` → `npm run build`.
 - Never `any`; never re-declare a Kiota-generated type — import and narrow it.
+- **A three-state async read** (loading / failed+Retry / genuinely-empty) copies
+  `useSpacesStore.loadSpaceContents` + `SpaceView.vue`'s
+  `isLoadingContents` / `loadFailed` blocks: state machine in the store, two boolean
+  getters out, `BaseEmptyState` + `size="sm"` Retry in the view. Never let "empty
+  array" stand in for "not loaded" — that's the B-16/B-18 bug class.
+- There **is** a frontend test suite: `npm test` (`vitest run`), exemplar
+  `src/stores/useSpacesStore.flush.test.ts` — mocks the api/queryClient modules and
+  drives the Pinia store. Use it only for data-integrity cases with timing a manual
+  browser drive can't hit; otherwise `npm run build` + a manual drive is the gate.
 
 ---
 

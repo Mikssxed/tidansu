@@ -64,6 +64,17 @@ export const useSpacesStore = defineStore('spaces', () => {
     const spaces = ref<Space[]>([]);
     const currentId = ref<string | null>(null);
     const hydrated = ref(false);
+    /** State machine behind `hydrate` (B-18 U-2) — mirrors the `isContentsLoading`/
+     * `isContentsFailed` trio one level down, but as a single status rather than a
+     * per-id set since only one account-wide fetch is ever in flight. */
+    const hydrateStatus = ref<'idle' | 'loading' | 'loaded' | 'failed'>('idle');
+    /** Generation counter guarding `hydrate` (B-18 review M1). `App.vue`'s boot call and
+     * `useAuth.consume`'s forced call can genuinely overlap (an already-signed-in user
+     * opening a fresh magic link), and `reset()` can run mid-flight on sign-out. Each
+     * `hydrate()` call captures the epoch current at its start; only the call that is
+     * still current when its fetch resolves may write `hydrateStatus`/`hydrated`/`spaces`
+     * or fire the seed. `reset()` bumps it so an orphaned call can't re-arm anything. */
+    let hydrateEpoch = 0;
     const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
     const changeSets = new Map<string, ChangeSet>();
     const inFlight = new Set<string>();
@@ -95,6 +106,10 @@ export const useSpacesStore = defineStore('spaces', () => {
     const currentSpace = computed(
         () => spaces.value.find((s) => s.id === currentId.value) ?? null
     );
+    /** Initial account-wide spaces fetch is in flight (B-18 U-2). */
+    const isHydrating = computed(() => hydrateStatus.value === 'loading');
+    /** Initial account-wide spaces fetch's most recent attempt failed (B-18 U-2). */
+    const isHydrateFailed = computed(() => hydrateStatus.value === 'failed');
 
     function isContentsLoaded(id: string): boolean {
         return contentsLoaded.value.has(id);
@@ -395,30 +410,73 @@ export const useSpacesStore = defineStore('spaces', () => {
         void api.remove(id).catch(handleDeleteError);
     }
 
-    /** Load page 1 of space summaries from the server; seed a starter fridge when the account has none. */
+    /**
+     * Load page 1 of space summaries from the server; seed a starter fridge when the
+     * account has none.
+     *
+     * Swallows its own error instead of rejecting (B-18 U-2) — deliberate. Two callers
+     * depend on this: `App.vue`'s `void spaces.hydrate()` would otherwise leave an
+     * unhandled promise rejection on a failed boot fetch, and `useAuth.consume`'s
+     * `await spaces.hydrate(true)` would reject and let `LoginView.consumeToken`'s bare
+     * `catch` misreport a spaces-fetch failure as "That sign-in link is invalid or has
+     * expired" for a user whose tokens were in fact set. After the swallow, sign-in
+     * always completes and the dashboard renders the real error panel + Retry instead.
+     * Do not "fix" this back into a rethrow.
+     *
+     * Deliberately has no in-flight early-return: `useAuth.consume` awaits this call and
+     * relies on it meaning "spaces are loaded" — an early-return would resolve instantly
+     * and navigate to a still-empty dashboard.
+     *
+     * `hydrated` is only ever set true on success, inside the `try` — never on the
+     * failure path — so a later `hydrate()` never short-circuits past a failed fetch,
+     * and Retry always re-attempts the real request. The starter-fridge seed stays
+     * inside the `try`, after that success transition, so a failed fetch can never
+     * seed a phantom space.
+     *
+     * Concurrent calls (B-18 review M1): App.vue's boot call and useAuth.consume's
+     * forced call can genuinely overlap for an already-signed-in user opening a fresh
+     * magic link. Each call captures `hydrateEpoch` at its start and, once its fetch
+     * resolves, writes state only if that epoch is still current — so a losing call
+     * can never paint a stale status/dataset over a winner's, and a `reset()` mid-flight
+     * orphans the pending call instead of letting it re-arm `hydrateStatus` afterwards.
+     * This is not an in-flight early-return (still deliberately absent, see above) —
+     * every call still runs its own fetch and its `await` still resolves normally.
+     */
     async function hydrate(force = false): Promise<void> {
         if (hydrated.value && !force) return;
-        const key = spacesQueryKey(1);
-        const result = force
-            ? await api.listPage(1, PAGE_SIZE)
-            : await queryClient.fetchQuery({ queryKey: key, queryFn: () => api.listPage(1, PAGE_SIZE) });
-        if (force) queryClient.setQueryData(key, result);
-        // Keep any fully-loaded space this page doesn't include (B-16 M1: a deep-link/
-        // refresh fetched a page-2+ space directly, possibly concurrently with this
-        // call) — a plain overwrite would silently undo that fetch.
-        const freshIds = new Set(result.spaces.map((s) => s.id));
-        const deepLinked = spaces.value.filter((s) => !freshIds.has(s.id) && contentsLoaded.value.has(s.id));
-        spaces.value = [...result.spaces, ...deepLinked];
-        total.value = result.total;
-        loadedPage.value = result.page;
-        hydrated.value = true;
+        const epoch = ++hydrateEpoch;
+        hydrateStatus.value = 'loading';
+        try {
+            const key = spacesQueryKey(1);
+            const result = force
+                ? await api.listPage(1, PAGE_SIZE)
+                : await queryClient.fetchQuery({ queryKey: key, queryFn: () => api.listPage(1, PAGE_SIZE) });
+            // Superseded by a newer hydrate() or a reset() that ran while this call was
+            // in flight — a losing call must not overwrite the winner's state or fire
+            // the seed (B-18 review M1).
+            if (epoch !== hydrateEpoch) return;
+            if (force) queryClient.setQueryData(key, result);
+            // Keep any fully-loaded space this page doesn't include (B-16 M1: a deep-link/
+            // refresh fetched a page-2+ space directly, possibly concurrently with this
+            // call) — a plain overwrite would silently undo that fetch.
+            const freshIds = new Set(result.spaces.map((s) => s.id));
+            const deepLinked = spaces.value.filter((s) => !freshIds.has(s.id) && contentsLoaded.value.has(s.id));
+            spaces.value = [...result.spaces, ...deepLinked];
+            total.value = result.total;
+            loadedPage.value = result.page;
+            hydrated.value = true;
+            hydrateStatus.value = 'loaded';
 
-        if (total.value === 0) {
-            const starter = seedFridge();
-            spaces.value.push(starter);
-            contentsLoaded.value.add(starter.id);
-            total.value += 1;
-            createRemote(starter);
+            if (total.value === 0) {
+                const starter = seedFridge();
+                spaces.value.push(starter);
+                contentsLoaded.value.add(starter.id);
+                total.value += 1;
+                createRemote(starter);
+            }
+        } catch (e) {
+            console.error('[spaces] hydrate failed', e);
+            if (epoch === hydrateEpoch) hydrateStatus.value = 'failed';
         }
     }
 
@@ -497,6 +555,8 @@ export const useSpacesStore = defineStore('spaces', () => {
         spaces.value = [];
         currentId.value = null;
         hydrated.value = false;
+        hydrateStatus.value = 'idle';
+        hydrateEpoch++; // orphan any in-flight hydrate() — it must not re-arm status/data after sign-out
         total.value = 0;
         loadedPage.value = 0;
         contentsLoaded.value = new Set();
@@ -730,6 +790,8 @@ export const useSpacesStore = defineStore('spaces', () => {
         hasMoreSpaces,
         currentSpace,
         hydrated,
+        isHydrating,
+        isHydrateFailed,
         saveState,
         getById,
         hydrate,
