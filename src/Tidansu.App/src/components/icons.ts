@@ -16,6 +16,10 @@ export const ICON_PATHS = {
     grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
     list: 'M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01',
     lock: 'M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3',
+    // Generic failure/warning mark. Deliberately distinct from `lock`, which is
+    // reserved for plan-gate surfaces (paywall, read-only badge, at-limit tiles) —
+    // a non-plan sync failure must not look like a plan cap (B-19 review M1).
+    alert: 'M12 4l9 16H3l9-16zM12 10v4M12 17h.01',
     edit: 'M4 20h4l11-11a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5 4 20z',
     settings:
         'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.4-2.5h-4l-.4 2.5a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.6a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.5h4l.4-2.5a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.6c.1-.3.1-.7.1-1z',

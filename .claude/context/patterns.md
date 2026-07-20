@@ -58,6 +58,7 @@ Read `AddZoneCommandHandler.cs` — it is the reference implementation. The orde
 | You are adding… | Copy the shape of… | Notes |
 |---|---|---|
 | A **base UI primitive** | `src/components/base/BaseButton.vue` (+ `base/index.ts`) | Variant union → `Record<Variant,string>` static class map; `twMerge` for external `class`. |
+| …its **root element's classes** | `src/components/base/BaseBadge.vue:29-34` | Emit **one** `:class="classes"` — fold base + variant classes into a single `twMerge(base, variantClasses[props.variant])`. Never split a static `class="…"` alongside `:class` on the same element: twMerge can't see across the two, so same-property utilities (e.g. `bg-surface-2` + `bg-warn/10`) both survive and the winner falls out of `style.css` declaration order. |
 | A **feature component** | `src/components/space/ItemRow.vue`, `spaces/SpaceCard.vue` | Feature comps live under `components/<feature>/`. Compose base primitives. |
 | A **page view** | `src/views/SpaceView.vue`, `DashboardView.vue` | One view per route; views compose feature components, no raw UI logic. |
 | A **data-access composable** | `src/composables/useSpacesApi.ts`, `useAccountApi.ts` | Wrap the Kiota call in TanStack Query `useQuery`/`useMutation`; mutations invalidate query keys. Never call the client outside a composable. |

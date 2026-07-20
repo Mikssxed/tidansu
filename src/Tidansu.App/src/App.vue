@@ -1,6 +1,7 @@
 <script setup lang="ts">
     import AppLayout from '@/components/layout/AppLayout.vue';
     import PlainLayout from '@/components/layout/PlainLayout.vue';
+    import { BaseToast } from '@/components/base';
     import PaywallModal from '@/components/paywall/PaywallModal.vue';
     import { usePlanCaps } from '@/composables/usePlanCaps';
     import { useAuthStore } from '@/stores/useAuthStore';
@@ -26,6 +27,10 @@
         void planCaps.hydrate();
         if (auth.hasTokens) void spaces.hydrate();
     });
+
+    function onDismissSaveMessage(): void {
+        spaces.dismissSaveMessage();
+    }
 </script>
 
 <template>
@@ -35,4 +40,13 @@
 
     <!-- Single app-wide paywall; opened with a reason via useLimits() on any cap. -->
     <PaywallModal />
+
+    <!-- Single app-wide save-failure toast; raised by useSpacesStore on any
+         non-plan-cap create/update/delete failure, on whichever view is open. -->
+    <BaseToast
+        v-if="spaces.saveMessage"
+        :message="spaces.saveMessage"
+        variant="warn"
+        @dismiss="onDismissSaveMessage"
+    />
 </template>

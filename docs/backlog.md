@@ -334,7 +334,11 @@ _Touch points:_ `src/Tidansu.App` — `useLimits.ts`, `DashboardView.vue`, `Spac
 
 ### [B-18] Loading + error/retry states for spaces hydrate (U-2)
 **Priority**: P2
-**Status**: unprocessed
+**Status**: done — shipped (commit 166b04b). `hydrate` is now an idle/loading/loaded/failed state
+machine; the seed is unreachable on any failure path. Review turned up one 🟠: the two callers
+*can* overlap (already-signed-in user opening a fresh magic link), so a module-scoped epoch
+counter gates every post-await write and `reset()` orphans in-flight calls. Accessibility
+(`role="status"` on the loading block) deliberately left out — pre-existing, matches `SpaceView`.
 From the B-8 audit (🟠 U-2). The initial spaces load (`App.vue` → `useSpacesStore.hydrate`) is
 fire-and-forget with no loading or error state. A failed fetch (offline, 500, expired token)
 leaves `spaces = []`, so `DashboardView` shows "No spaces yet" to a user who *has* data — and
@@ -346,15 +350,32 @@ _Touch points:_ `App.vue`, `src/Tidansu.App/src/stores/useSpacesStore.ts`, `Dash
 
 ### [B-19] Surface (not swallow) non-plan space-sync failures (U-3)
 **Priority**: P2
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-20 — built, driven-verified & reviewed; see
+`docs/active/tasks/b-19-surface-space-sync-failures/`. Global dismiss-only toast on any
+non-plan sync failure, auto-dismissing at 6s, hosted app-level so it is view-independent;
+plan-cap failures still open the paywall and raise no toast.)
+
 From the B-8 audit (🟠 U-3). Space create/update/delete mutate the store optimistically then
-persist via `.catch(handleSyncError)`, which handles only the plan-limit 403 — every other
-failure (network, 500, 401) is `console.error`-only. The user sees the edit "succeed" locally,
-gets zero feedback that it never persisted, and loses it on reload (created spaces vanish, edits
-revert). On non-plan errors, surface a user-visible toast/banner and either retry or roll back
-the optimistic change so local state matches the server. Reuse the transient-message pattern
-already used by `setPlan`.
-_Touch points:_ `src/Tidansu.App/src/stores/useSpacesStore.ts` (`handleSyncError`).
+persist, and only the plan-limit 403 was handled — every other failure (network, 500, 401)
+was `console.error`-only. The user saw the edit "succeed" locally, got zero feedback that it
+never persisted, and lost it on reload.
+
+**Note — this entry's original text was already stale when the task was picked up.** It
+described `handleSyncError` and asked for rollback work, but B-15/16/17/18 had since split
+that function into `handleCreateError` / `handleDeleteError` / `recordFailure` and had
+*already implemented* rollback (`applyRollback`, `discardSpaceLocally`) plus per-mutation
+tracking in `saveState`. The delivered scope was therefore presentation-only: rendering the
+failure `saveState` was already recording but nothing consumed. Retry was explicitly
+rejected — replaying a rolled-back op would reopen the `ChangeSet`/flush machinery B-15/16
+had just stabilized, and rollback already leaves local state consistent.
+
+Shipped: `saveMessage` + `dismissSaveMessage()` on the store (mirroring `setPlan`'s
+transient-message pattern), a new `BaseToast` base primitive, and an `alert` glyph in
+`icons.ts` — deliberately distinct from `lock`, which stays reserved for plan gates, so a
+generic failure never looks like a paywall. Coalescing is one message per flush window.
+_Touch points:_ `src/Tidansu.App/src/stores/useSpacesStore.ts`,
+`src/Tidansu.App/src/components/base/BaseToast.vue`, `src/Tidansu.App/src/components/icons.ts`,
+`App.vue`.
 
 ### [B-22] Zone/Item primary keys are globally unique + client-supplied → cross-tenant DoS
 **Priority**: P1

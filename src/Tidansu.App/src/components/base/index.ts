@@ -8,3 +8,4 @@ export { default as BasePopoverMenu } from './BasePopoverMenu.vue';
 export { default as BasePopoverMenuItem } from './BasePopoverMenuItem.vue';
 export { default as BaseProgressBar } from './BaseProgressBar.vue';
 export { default as BaseText } from './BaseText.vue';
+export { default as BaseToast } from './BaseToast.vue';

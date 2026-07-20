@@ -25,6 +25,11 @@ import { computed, ref } from 'vue';
 /** Spaces-summary page size (matches the API controller's default, see B-16). */
 const PAGE_SIZE = 20;
 
+/** Plain-language, plural-safe (B-19 FR-1): no status code, exception text, or
+ * internal op/store vocabulary — one message may stand for several failed ops
+ * under the coalescing rule. */
+const SAVE_FAILED_MESSAGE = "Couldn't save your latest changes — please try again.";
+
 /** Build a new item, assigning the next free slot index within its zone. */
 function makeItem(space: Space, name: string, zoneId: string, quantity: number): Item {
     const slotIndex = space.items.filter((it) => it.zoneId === zoneId).length;
@@ -82,6 +87,8 @@ export const useSpacesStore = defineStore('spaces', () => {
     const saveState = ref<Map<string, { status: 'pending' | 'saved' | 'failed'; reason: PaywallReason | null }>>(
         new Map()
     );
+    /** Transient, user-visible message when a non-plan-cap save fails (B-19). */
+    const saveMessage = ref<string | null>(null);
 
     // ---- pagination (B-16 FR-9) ----
     /** Account-wide total from the last page fetched — the authoritative "used" count. */
@@ -154,6 +161,34 @@ export const useSpacesStore = defineStore('spaces', () => {
         saveState.value.set(key, { status: 'failed', reason });
     }
 
+    /** Clear the transient save-failure message (e.g. after the user dismisses it). */
+    function dismissSaveMessage(): void {
+        saveMessage.value = null;
+    }
+
+    /**
+     * One message per flush window (B-19 FR-5). A failure raises the message; further
+     * failures arriving while one is still showing do not stack or replace it — the
+     * wording is generic, so a repeat carries no extra information. Cleared only by
+     * the user dismissing it, the toast's auto-dismiss, or `reset()`.
+     *
+     * **What actually enforces FR-5 today is the single ref plus the constant message,
+     * not this guard** (B-19 review M3). Because every raise assigns the same
+     * `SAVE_FAILED_MESSAGE`, writing it twice is indistinguishable from writing it once
+     * — Vue skips `Object.is`-equal writes, so not even a `watch` could tell, and the
+     * store's tests pass with this early-return deleted. Do not read its presence as
+     * evidence that coalescing is tested.
+     *
+     * It is kept deliberately as defence-in-depth: the moment the message becomes
+     * dynamic (per-space name, a count, a reason), the guard is what stops N failures
+     * from flickering N different strings through one window. Keep it and this note
+     * together.
+     */
+    function raiseSaveMessage(): void {
+        if (saveMessage.value !== null) return;
+        saveMessage.value = SAVE_FAILED_MESSAGE;
+    }
+
     /** Forget a space and every scrap of pending state keyed to it. */
     function discardSpaceLocally(spaceId: string): void {
         spaces.value = spaces.value.filter((s) => s.id !== spaceId);
@@ -189,12 +224,16 @@ export const useSpacesStore = defineStore('spaces', () => {
         total.value = Math.max(0, total.value - 1);
         const reason = planReasonOf(error);
         if (reason) openPaywall(reason);
-        else console.error('[spaces] space create failed', error);
+        else {
+            console.error('[spaces] space create failed', error);
+            raiseSaveMessage();
+        }
     }
 
     /** A failed whole-space DELETE: surfaced, never a paywall (deletes never trip a cap). */
     function handleDeleteError(error: unknown): void {
         console.error('[spaces] space delete failed', error);
+        raiseSaveMessage();
     }
 
     /**
@@ -217,6 +256,7 @@ export const useSpacesStore = defineStore('spaces', () => {
             openPaywall(reason);
         } else {
             console.error('[spaces] sync failed', error);
+            raiseSaveMessage();
         }
         markFailed(key, reason);
     }
@@ -552,6 +592,7 @@ export const useSpacesStore = defineStore('spaces', () => {
         changeSets.clear();
         inFlight.clear();
         saveState.value.clear();
+        saveMessage.value = null;
         spaces.value = [];
         currentId.value = null;
         hydrated.value = false;
@@ -793,6 +834,8 @@ export const useSpacesStore = defineStore('spaces', () => {
         isHydrating,
         isHydrateFailed,
         saveState,
+        saveMessage,
+        dismissSaveMessage,
         getById,
         hydrate,
         loadMoreSpaces,

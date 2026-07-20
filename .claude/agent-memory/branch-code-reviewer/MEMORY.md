@@ -16,3 +16,5 @@
 - [Two item-remove entry points](two-item-remove-entry-points.md) — SpaceView list view removes items via BOTH ItemDetailModal AND ItemRow "×"; gating tasks hide one and miss the other
 - [Hydrate caller overlap premise](hydrate-caller-overlap-premise.md) — "the two hydrate callers can't overlap" is false; single status refs go last-writer-wins, fix with an epoch not an early-return
 - [Loading state untested in store suites](loading-state-untested-in-store-suites.md) — store suites assert only settled state; deleting the `status='loading'` line usually reddens nothing
+- [Recurring frontend review findings](review_recurring-frontend-findings.md) — split class/`:class` defeating twMerge, the `lock` icon as reserved paywall vocabulary, latch tests that assert an idempotent constant
+- [Tidansu pipeline review context](review_tidansu-pipeline-context.md) — backlog.md is stale, task.md is authoritative; work may be uncommitted on main; store invariants that must not be "fixed"
