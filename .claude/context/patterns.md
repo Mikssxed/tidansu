@@ -50,6 +50,11 @@ Read `AddZoneCommandHandler.cs` — it is the reference implementation. The orde
   same change.
 - `ExecuteDeleteAsync`/`ExecuteUpdateAsync` run outside the current tracking
   transaction — see `feature-developer` memory before relying on them in a lock.
+- **State the ownership predicate inline; never let it follow from a key being
+  globally unique.** B-22 narrowed `Zone`/`Item` to `HasKey(SpaceId, Id)`, which turned
+  every accidentally-safe `WHERE Id = @id` into a potential cross-tenant match.
+  `SpacesRepository.RemoveItemAsync` is the exemplar: `i.SpaceId == spaceId` is written
+  out even though the ownership `EXISTS` already implies it.
 
 ---
 

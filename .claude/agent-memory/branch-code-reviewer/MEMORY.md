@@ -8,6 +8,8 @@
 - [NuGetAuditSuppress per-project](nugetauditsuppress-per-project.md) — suppressions duplicated across csproj files is correct (per-project audit), not a DRY violation; must be advisory-ID-scoped
 - [sp_getapplock return-code check](sp-getapplock-return-code-check.md) — app-lock silently fails open on timeout unless its return code is captured; Major finding on atomic-cap/lock changes
 - [FluentValidation .Must NRE on JSON null](fluentvalidation-must-nre-on-json-null.md) — `= []` initializers don't stop STJ writing explicit null; `.Must(x => x.Count)` → 500. Check every new validator
+- [Collation vs ordinal uniqueness checks](collation-vs-ordinal-uniqueness-checks.md) — an in-memory `Distinct()` guarding a SQL unique constraint is ordinal but the DB is CI_AS; "z1"/"Z1" still 500s
+- [No Application test project](no-application-test-project.md) — `tests/` is Domain-only, so validators/handlers ship untested; write the throwaway test yourself to find the bugs
 - [Verify claims vs test count](verify-claims-vs-test-count.md) — "N/N green" can hide tautological tests; ask what edit would make each new test go red
 - [Corroborating manual observation claims](corroborating-manual-observation-claims.md) — "I read the SQL log" is checkable: look for detail the plan couldn't have supplied (real table names vs the plan's idealized text)
 - [Optimistic rollback review checks](optimistic-rollback-review-checks.md) — two silent-data-loss shapes in the store flush: snapshot Object.assign stomping child arrays; cascade delete racing reassignment updates

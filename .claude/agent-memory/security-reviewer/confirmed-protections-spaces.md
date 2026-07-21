@@ -40,4 +40,32 @@ effort on what changed.
   under the lock. Updates/deletes get **no gate call at all** — that absence is the
   intended post-downgrade rule (D-1), NOT a missing check. Do not report it as one.
 
+Added after the **B-22 audit (2026-07-21)** — composite `(SpaceId, Id)` keys on Zone/Item:
+
+- **`Zone`/`Item` are reached in exactly ONE file.** A repo-wide grep for `Set<Item>`/
+  `Set<Zone>`/`.Zones`/`.Items`/`FindAsync`/`Entry(` hits only `SpacesRepository.cs` plus
+  the `TidansuDbContext` mapping. No controller/handler/service touches them directly, so
+  the tenant-isolation surface is one file. Re-run that grep on any diff adding an entity
+  access path; if it grows past one file, the structural argument is gone.
+- **The composite key made owner-scoping load-bearing, and every query survived it.** All
+  child queries root at `Spaces.Where(s => s.Id == spaceId && s.UserId == userId)` and
+  reach through `s.Zones`/`s.Items` (EF joins on SpaceId), so the trailing `z.Id == zoneId`
+  is a filter *within* an owner-restricted set. `RemoveItemAsync` now also states
+  `i.SpaceId == spaceId` inline. `RemoveZoneWithItemsAsync` remains the sole documented
+  exception and is safe (its `zone` is owner-resolved first).
+- **No key column is client-mutable.** `UpdateZone`/`UpdateItemCommandHandler` assign only
+  non-key fields — never `Id` or `SpaceId`. Moving a row across tenants isn't expressible.
+- **Both 500 branches in `ErrorHandlingMiddleware` are byte-identical.** The
+  `DbUpdateException` clause and the catch-all produce the same status, content-type and
+  `{"errors":{"general":["Something went wrong."]},"isSuccess":false}`. `ApiOperationResult`
+  has only `Errors` + `IsSuccess` — **no traceId/timestamp**, so nothing per-request can
+  differ. Don't re-derive this; just check the shape hasn't grown a field.
+- **Every `NotFoundException` under `Spaces/` reflects only the caller's own request input**
+  (route segment or `dto.ZoneId`), never a DB-read value. Safe self-reflection.
+- **The AddZone/AddItem duplicate-id TOCTOU race is benign and verified so:** the composite
+  key is a real backstop (fail-closed), both racers are the same user on their own space,
+  and the failed `SaveChangesAsync` rolls back via `await using` — since the applock is
+  `@LockOwner='Transaction'` it is released, so **no lock is stranded** and it can't be
+  escalated into lock-exhaustion. That last point is the one that makes it benign.
+
 See [[recurring-gaps-tidansu]] for what does still go wrong here.

@@ -106,6 +106,22 @@ public class CreateTaskCommandValidator : AbstractValidator<CreateTaskCommand>
 
 Validation errors throw `Tidansu.Domain.Exceptions.ValidationException` and are caught by `ErrorHandlingMiddleware` → 400 BadRequest.
 
+> **Always `.NotNull()` before `.Must()` on a reference/collection property.** A `= []` /
+> `= null!` DTO initializer only covers an *omitted* JSON key — `System.Text.Json` writes an
+> explicit `null` straight over it (the API does not opt into `RespectNullableAnnotations`), and
+> FluentValidation runs the `Must` predicate anyway, so `.Must(x => x.Count <= N)` NREs into a
+> **500** on `"zones": null`. `RuleForEach` and `MaximumLength` are null-safe; only `.Must` and
+> custom predicates are exposed. Hit twice: B-13 (`ItemDtoValidator.Tags`), B-22
+> (`SpaceDtoValidator.Zones`/`Items`).
+
+> **In-memory id/string uniqueness checks must match the DB collation.** `Distinct()` and
+> `HashSet<string>` default to ordinal; the database is `SQL_Latin1_General_CP1_CI_AS`
+> (case-**insensitive**, and SQL Server ignores trailing whitespace in `nvarchar` equality). An
+> ordinal duplicate check in front of a unique constraint lets `"z1"`/`"Z1"` through into a
+> `DbUpdateException` 500. Use `StringComparer.OrdinalIgnoreCase` over `TrimEnd()`-normalised
+> values, or constrain the column to a charset where the two agree. Found in B-22
+> (`SpaceDtoValidator.HasNoDuplicateIds`).
+
 ---
 
 ## DTO mapping

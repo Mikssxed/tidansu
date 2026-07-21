@@ -14,14 +14,21 @@ have been in what the checklist doesn't name.
 
 **How to apply:** on any diff touching entities, DTOs, validators, or endpoint shape.
 
-- **Client-supplied primary keys that are globally unique.** `Space`/`Zone`/`Item` all take
-  their `Id` from the client DTO, and all three are `PrimaryKey(x => x.Id)` — *not* scoped
-  by `SpaceId`/`UserId`. Combined with the frontend's `uid()` in `src/data/spaces.ts`
-  (a module-level counter that resets each page load + the low 3 base36 digits of
-  `Date.now()` ≈ 46,656 values, cycling ~47s — a clock, not a CSPRNG), one account can
-  squat the id space and turn every other user's insert into a PK violation → 500. Filed as
-  S-H1 in `docs/active/tasks/B-15-granular-space-endpoints/security-review.md` (2026-07-16).
-  **If this is still open, any new client-keyed entity inherits it.**
+- **Client-supplied primary keys that are globally unique.** All three of
+  `Space`/`Zone`/`Item` take their `Id` from the client DTO. The frontend's `uid()` in
+  `src/data/spaces.ts` is a module-level counter that resets each page load + the low 3
+  base36 digits of `Date.now()` ≈ 46,656 values, cycling ~47s — a clock, not a CSPRNG — so
+  one account can squat the id space and turn every other user's insert into a PK violation
+  → 500 (cross-tenant DoS) plus a 200-vs-500 existence oracle. Filed S-H1 in
+  `docs/active/tasks/B-15-granular-space-endpoints/security-review.md` (2026-07-16).
+  **Status as of 2026-07-21 (B-22): fixed for `Zone`/`Item` only** — both are now
+  `HasKey(SpaceId, Id)`. **`Space.Id` is still a single-column client-supplied PK** (no
+  `HasKey` on `Entity<Space>` → EF convention), with no existence pre-check in
+  `CreateSpaceCommandHandler` and no rate limiter on `POST /api/spaces`; Pro has unlimited
+  spaces, so the squat is cheap. Re-filed as S-H1 in B-22's `security-review.md`.
+  Don't be fooled by B-22's comments in `ErrorHandlingMiddleware` / `SpacesRepository`:
+  they read repo-wide but are scoped to Zone/Item, and the `DbUpdateException`→500 clause
+  hides the *message*, not the 200-vs-500 *signal*. Any new client-keyed entity inherits this.
 - **Unbounded collection/scalar fields slip past validators.** `ColumnLabels`
   (`List<string>?` → EF primitive collection → unbounded column) and `LayoutColumns` (`int`,
   no range) have never had validator rules, in either `SpaceDtoValidator` or the newer

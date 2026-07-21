@@ -12,5 +12,6 @@
 - [Validation preempts the plan-gate 403](validation-preempts-plan-gate-403.md) — FluentValidation runs before handlers, so a 400 beats the paywall 403 on plan-gated fields; empty-string photo counts as a photo
 - [Shared DTO + full-replace = silent field wipe](shared-dto-full-replace-wipe.md) — narrowing a read that shares its DTO with a full-replace update handler wipes the dropped field on next edit; fix = write patch semantics (`is not null`), not a DTO split (B-16 photo TRAP)
 - [Paywall vs generic error surfacing](frontend_paywall-vs-generic-error-surfacing.md) — raise a generic "didn't save" surface only inside the existing `else` of `planReasonOf`; structural exclusivity, not a second check (B-19)
+- [Space-scoped Zone/Item keys](arch_space-scoped-zone-item-keys.md) — no Item→Zone FK exists (don't add one); key widening can't fail on existing data; bare-id lookups stop being accidentally safe (B-22)
 - [Frontend downgrade read-only seam](frontend_downgrade-readonly-seam.md) — over-cap read-only is a UI-only gate: computed in useLimits (slice store.spaces by cap, stable Id order), gated at the view layer not the store; server enforcement is a separate follow-up (B-17)
 </content>
