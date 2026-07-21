@@ -46,6 +46,20 @@ public class AddItemCommandHandler(
         // photos while holding sp_getapplock.
         SpacePhotoGuard.ThrowIfInvalid(dto.Photo, "Item.Photo");
 
+        // In-space duplicate-id pre-check (F-6): after the 404/403/photo-guard gates
+        // above, before the insert. ItemExistsInSpaceAsync is owner-scoped (D-3), so
+        // this can only ever observe the caller's own space — no new existence oracle.
+        // It is a check-then-insert race, not enforcement (C-5): a concurrent
+        // duplicate add can still slip past into the composite-key constraint, which
+        // is what the ErrorHandlingMiddleware DbUpdateException backstop is for. Do
+        // not widen sp_getapplock to close that race — it would serialize every add
+        // for a case that costs nothing and leaks nothing.
+        if (await spaces.ItemExistsInSpaceAsync(request.SpaceId, dto.Id, userId, cancellationToken))
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Item.Id"] = ["An item with this id already exists in this space."],
+            });
+
         var entity = dto.ToEntity(request.SpaceId);
         var itemCap = PlanCaps.For(user.Plan).Items;
 

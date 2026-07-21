@@ -84,6 +84,13 @@ public class TidansuDbContext(DbContextOptions<TidansuDbContext> options) : Iden
 
         modelBuilder.Entity<Zone>(zone =>
         {
+            // Composite key scopes zone ids to their owning space (B-22): before this, PK_Zone
+            // was on Id alone, so ids were unique across every tenant's spaces — a client-
+            // supplied, clock-derived id from one user could collide with another user's zone
+            // and 500. SpaceId leads (not Id) because every read path filters by space first;
+            // the clustered key co-locates one space's zones on the same pages.
+            zone.HasKey(z => new { z.SpaceId, z.Id });
+
             zone.Property(z => z.Id).HasMaxLength(64);
             zone.Property(z => z.Label).HasMaxLength(120);
             zone.Property(z => z.Color).HasMaxLength(16);
@@ -93,6 +100,11 @@ public class TidansuDbContext(DbContextOptions<TidansuDbContext> options) : Iden
 
         modelBuilder.Entity<Item>(item =>
         {
+            // Composite key scopes item ids to their owning space (B-22) — see the matching
+            // comment on Entity<Zone> above. ZoneId is intentionally left out of the key: it is
+            // a bare, unconstrained column (Item.cs) with no FK to Zone, and stays that way.
+            item.HasKey(i => new { i.SpaceId, i.Id });
+
             item.Property(i => i.Id).HasMaxLength(64);
             item.Property(i => i.Name).HasMaxLength(200);
             item.Property(i => i.ZoneId).HasMaxLength(64);

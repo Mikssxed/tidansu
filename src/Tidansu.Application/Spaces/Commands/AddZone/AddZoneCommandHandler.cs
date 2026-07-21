@@ -32,6 +32,20 @@ public class AddZoneCommandHandler(
         if (PlanPolicy.CheckAddZone(user.Plan, currentZones) is { } reason)
             throw new PlanLimitException(reason);
 
+        // In-space duplicate-id pre-check (F-6): after the 404/403 gates above, before
+        // the insert. ZoneExistsInSpaceAsync is owner-scoped (D-3), so this can only
+        // ever observe the caller's own space — no new existence oracle. It is a
+        // check-then-insert race, not enforcement (C-5): a concurrent duplicate add can
+        // still slip past into the composite-key constraint, which is what the
+        // ErrorHandlingMiddleware DbUpdateException backstop is for. Do not widen
+        // sp_getapplock to close that race — it would serialize every add for a case
+        // that costs nothing and leaks nothing.
+        if (await spaces.ZoneExistsInSpaceAsync(request.SpaceId, request.Zone.Id, userId, cancellationToken))
+            throw new ValidationException(new Dictionary<string, string[]>
+            {
+                ["Zone.Id"] = ["A zone with this id already exists in this space."],
+            });
+
         var entity = request.Zone.ToEntity(request.SpaceId);
         var zoneCap = PlanCaps.For(user.Plan).Zones;
 

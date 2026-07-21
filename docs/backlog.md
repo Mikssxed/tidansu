@@ -377,9 +377,60 @@ _Touch points:_ `src/Tidansu.App/src/stores/useSpacesStore.ts`,
 `src/Tidansu.App/src/components/base/BaseToast.vue`, `src/Tidansu.App/src/components/icons.ts`,
 `App.vue`.
 
-### [B-22] Zone/Item primary keys are globally unique + client-supplied → cross-tenant DoS
+### [B-23] `Space.Id` is globally unique + client-supplied → the same cross-tenant DoS, one level up
 **Priority**: P1
 **Status**: unprocessed
+From the B-22 security review (🟠 S-H1). **B-22 fixed `Zone` and `Item`; `Space` was never in its
+scope and is still fully exposed** — this is the identical bug on the parent entity, not a variant.
+The same four facts compose:
+1. `modelBuilder.Entity<Space>` has **no `HasKey`** — EF's convention makes `Id` alone the PK, so
+   one space id is unique across every tenant.
+2. `SpaceDto.ToEntity:32` takes `Id` from the client verbatim; `CreateSpaceCommandHandler` has no
+   in-space/duplicate pre-check of any kind.
+3. `uid('space')` in `src/Tidansu.App/src/data/spaces.ts` is the same clock-derived generator with
+   only **46,656** reachable suffix values, cycling every ~47s (the counter resets on page load).
+4. Pro has **unlimited spaces** and `POST /api/spaces` has **no rate limiter**.
+
+So a Pro account can squat the space-id range and force every other user's *first space creation*
+to a 500 — the exact attack B-22 exists to kill — plus the same 200-vs-500 cross-tenant existence
+oracle. **B-22's new `DbUpdateException` clause does NOT close this**: it suppresses the exception
+*message* but still emits a 500, so the distinguishing signal survives intact.
+
+**Beware a specific trap.** B-22 left confident comments across `SpacesRepository.cs` and
+`TidansuDbContext.cs` about space-scoping now being "structural" and tenant isolation being
+"load-bearing". Those are accurate **for `Zone`/`Item` only** — they read repo-wide and make this
+remaining gap harder to see (flagged as 🟡 S-L2 in B-22's security review). Do not read them as
+covering `Space`.
+
+The fix is the same shape as B-22's but has **no composite-key option** — `Space` is the tenancy
+root, so there is no parent id to scope against. The real choice is between a **server-assigned id**
+(or CSPRNG) and **`(UserId, Id)` as the key**; both need an EF migration and a decision about the
+client contract, and the second changes the optimistic-add path B-22 deliberately protected. Weigh
+it properly at the tech-planning gate rather than assuming B-22's answer transfers.
+_Touch points:_ `src/Tidansu.Infrastructure/Persistence/TidansuDbContext.cs`, a new migration,
+`src/Tidansu.Application/Spaces/Dtos/SpaceDto.cs` (`ToEntity`), `CreateSpaceCommandHandler.cs`,
+`src/Tidansu.App/src/data/spaces.ts` (`uid`), and the misleading B-22 comments noted above.
+See `docs/active/tasks/B-22-scoped-zone-item-keys/security-review.md` § S-H1.
+
+### [B-22] Zone/Item primary keys are globally unique + client-supplied → cross-tenant DoS
+**Priority**: P1
+**Status**: ✅ done (2026-07-21 — built, both-reviewer'd & hardened; see
+`docs/active/tasks/B-22-scoped-zone-item-keys/`). Shipped the composite key
+`(SpaceId, Id)` on `Zone` and `Item` chosen at kickoff over server-assigned ids and a CSPRNG
+`uid()` — so the client's clock-derived `uid()` is deliberately unchanged. The feared data
+migration never materialised: `(Id)` was already unique table-wide, so `(SpaceId, Id)` is unique
+*a fortiori* and `ADD PRIMARY KEY` **cannot fail on any dataset** — zero rows change, one EF
+migration, no raw SQL. There is **no `Item` → `Zone` FK** (the brief's designated highest risk),
+so nothing needed re-pointing; not adding one was a user decision, not an oversight. Also shipped:
+defence-in-depth caps (500 zones / 5,000 items per request) and intra-request duplicate-id rules in
+`SpaceDtoValidator`, in-space duplicate-id pre-checks in the `AddZone`/`AddItem` handlers, a
+`DbUpdateException` clause in `ErrorHandlingMiddleware`, and explicit space-correlation in
+`RemoveItemAsync`. Review found **no 🔴**; two 🟠 both in `SpaceDtoValidator` and both fixed
+inline — the duplicate-id rule used ordinal `Distinct()` while the key it guards is enforced under
+`SQL_Latin1_General_CP1_CI_AS`, so `z1`/`Z1` (and trailing-space ids) passed validation and died at
+`SaveChangesAsync` as a 500; and the cap rules NRE'd on explicit JSON `null`. **The residual is
+filed as [B-23]** — `Space.Id` has the identical unfixed bug one level up. Root cause of both 🟠s:
+there is no `Tidansu.Application.Tests` project, so no suite could have caught validator logic.
 From the B-15 security review (🟠 S-H1). **Pre-existing — not introduced by B-15**, but B-15's
 review is what surfaced it. Three facts compose into a cross-tenant denial of service:
 1. `PK_Zone` / `PK_Item` are on `x => x.Id` **alone** (`Migrations/20260621142555_SpacesZonesItems.cs:57,90`)

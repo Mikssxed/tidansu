@@ -181,6 +181,33 @@ public class ErrorHandlingMiddleware(ILogger<ErrorHandlingMiddleware> logger) : 
 
             await context.Response.WriteAsJsonAsync(errorResponse);
         }
+        catch (Microsoft.EntityFrameworkCore.DbUpdateException ex)
+        {
+            // B-22 S-1/S-2: a persistence-level failure (e.g. a rare check-then-insert
+            // race losing to a concurrent duplicate — see SpacesRepository's
+            // ItemExistsInSpaceAsync/ZoneExistsInSpaceAsync pre-checks, C-5) must never
+            // surface a distinct shape from the generic 500 below. SQL Server's
+            // duplicate-key error text embeds the colliding key value verbatim — i.e.
+            // another tenant's real zone/item id — so ex.Message/ex.InnerException.Message
+            // must never reach the response. Logged server-side only; the body is
+            // byte-identical to the catch-all below (same status, same generic message):
+            // a caller must not be able to distinguish this from any other failure.
+            logger.LogError(ex, "Persistence failure: {Message}", ex.Message);
+
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/json";
+
+            var errorResponse = new ApiOperationResult
+            {
+                IsSuccess = false,
+                Errors = new Dictionary<string, string[]>
+                {
+                    { ApiOperationResult.GeneralErrorKey, new[] { "Something went wrong." } }
+                }
+            };
+
+            await context.Response.WriteAsJsonAsync(errorResponse);
+        }
         catch (Exception ex)
         {
             logger.LogError(ex, ex.Message);

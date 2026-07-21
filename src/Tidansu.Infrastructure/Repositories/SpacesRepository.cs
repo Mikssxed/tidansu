@@ -227,6 +227,16 @@ SELECT @res AS Value;")
     // or item by bare id, so an unscoped/cross-user mutation is not expressible
     // through this repository at all. Zone/Item have no Space navigation (see
     // TidansuDbContext), so they're reached via s.Zones/s.Items.
+    //
+    // B-22: since the Zone/Item primary key became (SpaceId, Id) (previously Id
+    // alone), this owner-scoping is no longer just how these queries happen to be
+    // written — it's load-bearing. Before, a bare Id was unique table-wide, so even
+    // an under-scoped `WHERE Id = @id` could only ever hit one row; now the same Id
+    // can legitimately exist in many spaces, so an under-scoped lookup could match
+    // (or mutate/delete) rows across tenants. Every query below is confirmed
+    // space/owner-rooted (see the B-22 audit note in git history); RemoveItemAsync
+    // in particular now states `i.SpaceId == spaceId` directly rather than only via
+    // the ownership EXISTS, for exactly this reason.
 
     // FR-7 / B-14: renaming a space (or flipping its view/canvas mode) must not
     // pull every zone and item — including each item's nvarchar(max) photo
@@ -274,6 +284,14 @@ SELECT @res AS Value;")
             .Where(s => s.Id == spaceId && s.UserId == userId)
             .SelectMany(s => s.Zones)
             .AnyAsync(z => z.Id == zoneId, cancellationToken);
+
+    // Mirrors ZoneExistsInSpaceAsync verbatim, for items — same D-3 owner-scoped root,
+    // no bare-id overload (F-6's in-space duplicate-id pre-check for AddItem).
+    public Task<bool> ItemExistsInSpaceAsync(string spaceId, string itemId, string userId, CancellationToken cancellationToken = default)
+        => dbContext.Spaces
+            .Where(s => s.Id == spaceId && s.UserId == userId)
+            .SelectMany(s => s.Items)
+            .AnyAsync(i => i.Id == itemId, cancellationToken);
 
     // Closes the same read-then-insert race as AddWithinSpaceCapAsync, but keyed
     // per SPACE rather than per user (D-4): two concurrent zone-add requests
@@ -389,14 +407,13 @@ SELECT @res AS Value;")
         // SaveChangesAsync, which is why this method opens its own explicit
         // transaction around both deletes.
         // zone.SpaceId (not the spaceId parameter) is used here on purpose. This is
-        // one of exactly TWO places in this file that reach an entity without the
-        // (spaceId, userId) filter written inline — the other is RemoveItemAsync,
-        // which instead carries ownership as an EXISTS subquery inside its DELETE.
-        // Neither is a gap in D-3: here, `zone` was itself resolved via the
-        // owner-scoped GetZoneAsync immediately above, so zone.SpaceId is already
-        // owner-verified. (Kept accurate per security review S-L2 — if a third
-        // such place ever appears, D-3 has stopped being structural and this
-        // comment is the tripwire.)
+        // the one place in this file that reaches an entity without the (spaceId,
+        // userId) filter written inline (RemoveItemAsync below states its own
+        // spaceId directly since B-22 — see its comment). It is not a gap in D-3:
+        // `zone` was itself resolved via the owner-scoped GetZoneAsync immediately
+        // above, so zone.SpaceId is already owner-verified. (Kept accurate per
+        // security review S-L2 — if a second such place ever appears, D-3 has
+        // stopped being structural and this comment is the tripwire.)
         await dbContext.Set<Item>()
             .Where(i => i.SpaceId == zone.SpaceId && i.ZoneId == zoneId)
             .ExecuteDeleteAsync(cancellationToken);
@@ -410,16 +427,30 @@ SELECT @res AS Value;")
     // Set-based on purpose, for the same reason as RemoveZoneWithItemsAsync's cascade
     // above (B-8 SC-2): resolving the item first via GetItemAsync would materialise the
     // whole row — including its nvarchar(max) Photo data-URL, megabytes for a Pro user —
-    // into memory purely to delete it. Ownership stays structural (D-3): the EXISTS
-    // subquery is part of the DELETE's WHERE, so an item is only ever removed when its
-    // space is owned by userId. A cross-user or unknown id both affect 0 rows and return
-    // false, which the handler turns into the same 404 — no divergence that would
-    // confirm the id exists.
+    // into memory purely to delete it. Ownership stays structural (D-3): the query
+    // filters directly on i.SpaceId == spaceId, plus an EXISTS confirming that space is
+    // owned by userId, so an item is only ever removed when it belongs to the space in
+    // the URL AND that space belongs to userId. A cross-user id, a cross-space id (a
+    // real item id that exists but in a different space of the same or another user) or
+    // an unknown id all affect 0 rows and return false, which the handler turns into the
+    // same 404 — no divergence that would confirm the id exists anywhere.
+    // B-22 (S-3): i.SpaceId == spaceId is stated inline as of B-22. To be precise about
+    // why — the earlier form was NOT relying on ids being globally unique. It was already
+    // entailed: s.Id == spaceId together with s.Id == i.SpaceId inside the EXISTS gives
+    // i.SpaceId == spaceId by transitivity, so this DELETE was correctly scoped before the
+    // key change and its behaviour is unchanged by it. (Review N2 corrected an earlier
+    // version of this comment that misattributed the safety to global uniqueness.)
+    // What the composite key changed is the margin for error, not the correctness: while a
+    // bare Id was unique table-wide, even an under-scoped variant of this query could only
+    // hit one row; now that the same Id can legitimately exist in many spaces, dropping the
+    // correlation would delete across tenants. Hence stating the predicate directly rather
+    // than leaving a future reader to re-derive it from the EXISTS.
     public async Task<bool> RemoveItemAsync(string spaceId, string itemId, string userId, CancellationToken cancellationToken = default)
     {
         var deleted = await dbContext.Set<Item>()
-            .Where(i => i.Id == itemId
-                        && dbContext.Spaces.Any(s => s.Id == spaceId && s.Id == i.SpaceId && s.UserId == userId))
+            .Where(i => i.SpaceId == spaceId
+                        && i.Id == itemId
+                        && dbContext.Spaces.Any(s => s.Id == spaceId && s.UserId == userId))
             .ExecuteDeleteAsync(cancellationToken);
         return deleted > 0;
     }

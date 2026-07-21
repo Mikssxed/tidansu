@@ -102,6 +102,14 @@ public interface ISpacesRepository
     Task<bool> ZoneExistsInSpaceAsync(string spaceId, string zoneId, string userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Whether <paramref name="itemId"/> already exists in the space owned by
+    /// <paramref name="userId"/> (in-space duplicate-id pre-check — F-6). Owner-scoped
+    /// like every other method here (D-3): it can only ever observe the caller's own
+    /// space, so it introduces no new existence oracle.
+    /// </summary>
+    Task<bool> ItemExistsInSpaceAsync(string spaceId, string itemId, string userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Atomically inserts <paramref name="zone"/> only if the owning space's zone
     /// count is still under <paramref name="zoneCap"/>, serializing concurrent
     /// same-space zone adds (Free plans only — see D-4). Returns
