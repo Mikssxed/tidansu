@@ -402,7 +402,7 @@ over-cap selection), possibly `src/Tidansu.App/src/stores/useSpacesStore.ts`
 
 ### [B-23] `Space.Id` is globally unique + client-supplied → the same cross-tenant DoS, one level up
 **Priority**: P1
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-23 — server-assigned CSPRNG `Space.Id` + per-account rate limit + store/route reconcile; both-reviewer'd clean, FR-6 verified via live browser drive; see `docs/active/tasks/B-23-scoped-space-keys/`. Residual parity item filed as B-25.)
 From the B-22 security review (🟠 S-H1). **B-22 fixed `Zone` and `Item`; `Space` was never in its
 scope and is still fully exposed** — this is the identical bug on the parent entity, not a variant.
 The same four facts compose:
@@ -533,7 +533,7 @@ _Touch points:_ `src/Tidansu.API/Program.cs` (culture config), possibly `Tidansu
 
 ### [B-24] Server-side enforcement of read-only over-cap content after downgrade
 **Priority**: P2
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-23 — shared over-cap gate across all 7 mutate handlers, delete kept as recovery path; both-reviewer'd clean, backend 403-matrix driven; see `docs/active/tasks/B-24-server-overcap-readonly/`. Renumbered from a colliding B-23.)
 Follow-up carved out of B-17. B-17 makes over-cap spaces read-only **in the SPA only** — it disables
 the mutating affordances and badges the spaces, but the API still accepts the mutations. A downgraded
 (Free) user holding a valid JWT can therefore still rename, add zones/items to, or otherwise mutate a

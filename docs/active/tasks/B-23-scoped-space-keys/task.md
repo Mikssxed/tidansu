@@ -2,7 +2,7 @@
 id: B-23
 slug: scoped-space-keys
 title: Space.Id globally unique + client-supplied → cross-tenant DoS (one level up from B-22)
-status: in-review          # draft → requirements → tech-planning → in-progress → in-review → done | blocked
+status: done          # draft → requirements → tech-planning → in-progress → in-review → done | blocked
 depends-on: []
 touch-points:
   - src/Tidansu.Infrastructure/Persistence/TidansuDbContext.cs

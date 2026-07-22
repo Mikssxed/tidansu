@@ -2,7 +2,7 @@
 id: B-24
 slug: server-overcap-readonly
 title: Server-side enforcement of read-only over-cap content after downgrade
-status: in-review   # draft → requirements → tech-planning → in-progress → in-review → done | blocked
+status: done   # draft → requirements → tech-planning → in-progress → in-review → done | blocked
 depends-on: []
 touch-points:
   - src/Tidansu.Application (space update, zone/item create/update handlers)
