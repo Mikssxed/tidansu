@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Tidansu.Application.Behaviors;
+using Tidansu.Application.Spaces;
 using Tidansu.Application.User;
 
 namespace Tidansu.Application.Extensions;
@@ -21,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddValidatorsFromAssembly(applicationAssembly);
 
         services.AddScoped<IUserContext, UserContext>();
+        services.AddScoped<SpaceOverCapGuard>();
         services.AddHttpContextAccessor();
     }
 }

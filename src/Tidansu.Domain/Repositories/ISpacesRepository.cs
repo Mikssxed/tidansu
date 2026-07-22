@@ -8,6 +8,17 @@ public interface ISpacesRepository
     Task<int> CountByUserAsync(string userId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The owner-scoped count of the user's spaces whose stable <c>Id</c> key sorts
+    /// before <paramref name="spaceId"/> — i.e. the target's 0-based rank in the
+    /// same <c>OrderBy(Id)</c> order <see cref="GetSpaceSummariesPageAsync"/> pages
+    /// by (B-24). A <c>SELECT COUNT(*)</c>, never a graph load. Assumes the caller
+    /// has already owner-verified the space (404 precedence) — this only ever
+    /// counts among <paramref name="userId"/>'s own spaces, so it introduces no new
+    /// existence oracle.
+    /// </summary>
+    Task<int> CountSpacesOrderedBeforeAsync(string spaceId, string userId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// A page of the user's spaces, projected to list-card summary columns only — no
     /// zones, items, or photo payloads (B-16 / SC-3). Ordered by the stable key
     /// <c>Id</c> before <c>Skip/Take</c> so paging is deterministic across requests.

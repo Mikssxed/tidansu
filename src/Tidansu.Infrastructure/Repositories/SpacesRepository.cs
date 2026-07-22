@@ -22,6 +22,20 @@ public class SpacesRepository(TidansuDbContext dbContext, ILogger<SpacesReposito
     public Task<int> CountByUserAsync(string userId, CancellationToken cancellationToken = default)
         => dbContext.Spaces.CountAsync(s => s.UserId == userId, cancellationToken);
 
+    // B-24: the target space's 0-based rank in the same OrderBy(Id) order
+    // GetSpaceSummariesPageAsync pages by. string.Compare(s.Id, spaceId) < 0 (NOT
+    // string.CompareOrdinal, and NOT an in-memory comparison) is deliberate: EF
+    // translates it to a relational `WHERE Id < @spaceId` evaluated under the Id
+    // column's own collation — the same collation SQL Server uses for
+    // `OrderBy(s => s.Id)`. Comparing ids in memory with C# ordinal semantics can
+    // silently pick a different over-cap set than the SPA badges (parity bug this
+    // query exists to avoid). Owner-scoped (D-3): only ever counts among userId's
+    // own spaces.
+    public Task<int> CountSpacesOrderedBeforeAsync(string spaceId, string userId, CancellationToken cancellationToken = default)
+        => dbContext.Spaces
+            .Where(s => s.UserId == userId && string.Compare(s.Id, spaceId) < 0)
+            .CountAsync(cancellationToken);
+
     // The account page only needs three integers (spaces/items/fullest-space); the full
     // graph (GetAllByUserAsync) carries every zone and item, including each item's
     // nvarchar(max) photo data-URL — megabytes for a Pro user with photo items, just to
@@ -237,6 +251,20 @@ SELECT @res AS Value;")
     // space/owner-rooted (see the B-22 audit note in git history); RemoveItemAsync
     // in particular now states `i.SpaceId == spaceId` directly rather than only via
     // the ownership EXISTS, for exactly this reason.
+    //
+    // B-22/B-23 scope note (security review § S-L2): the reasoning above is about
+    // Zone/Item ONLY — it does not, and never did, cover Space itself. Space has no
+    // parent id to scope against (it IS the tenancy root and the FK principal for
+    // Zone/Item), so it could not take the same composite-key fix; until B-23, its
+    // Id was client-supplied and globally unique, making it the one entity where an
+    // under-scoped or colliding id was still exploitable (cross-tenant DoS +
+    // existence oracle — B-22 § S-H1). B-23 closed that by server-assigning
+    // Space.Id from a CSPRNG (ISpaceIdGenerator) rather than re-keying Space — see
+    // CreateSpaceCommandHandler and the Entity&lt;Space&gt; comment in
+    // TidansuDbContext. Do not read this block as "tenant isolation is structural
+    // repo-wide"; it is structural for Zone/Item's composite key and, separately,
+    // for Space's id-forgery angle via server assignment — two different
+    // mechanisms for two different entity shapes.
 
     // FR-7 / B-14: renaming a space (or flipping its view/canvas mode) must not
     // pull every zone and item — including each item's nvarchar(max) photo

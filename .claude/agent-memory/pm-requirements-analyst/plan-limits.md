@@ -35,3 +35,19 @@ it does not mean hidden — viewing, list/layout switching, and **deleting**
 available on a read-only space. Confirmed via `PricingView`'s own FAQ copy:
 "Spaces and items beyond the Free limits become read-only until you're back
 under the cap or upgrade again."
+
+**Two independent gates — do not conflate (B-24):** There are two separate
+"over-cap" questions on a space and they must stay separate in requirements:
+(1) is *this whole space* one of the account's excess spaces beyond
+`caps.spaces` (B-17 SPA / B-24 server) — a space-cap question; (2) does a
+space's *own* zone/item count exceed the per-space `zones`/`items` cap — a
+content-count question, whose codebase rule (`PlanPolicy.cs`) deliberately
+gates **adds only**, never update/delete, so a downgraded Free user with e.g.
+8/6 zones can still rename/delete zones (only a 9th add is blocked). B-24
+(server-side enforcement mirroring B-17) is entirely about question (1); do
+not let it reintroduce an update/delete gate for question (2) — that's an
+explicitly-rejected-by-design bug, not a gap. B-24 additionally decided (as an
+assumption, PO to confirm) that zone/item **removal** inside an over-cap
+space should also be rejected server-side, to match what B-17's SPA already
+disables (SPA disables item removal and zone deletion, not just add/edit) —
+only whole-space delete is the exempted recovery path.

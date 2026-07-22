@@ -7,3 +7,5 @@
 - [Recurring gaps](recurring-gaps.md) — patterns that keep surfacing across reviews.
 - [Confirmed protections — spaces path](confirmed-protections-spaces.md) — traced-to-ground protections in Spaces/zones/items; don't re-flag these
 - [Recurring gaps in Tidansu](recurring-gaps-tidansu.md) — client-supplied global PKs, unbounded collection fields, size limits lost on endpoint splits
+- [Confirmed protections — over-cap gate + Space.Id](confirmed-protections-overcap-and-space-id.md) — verified B-23 CSPRNG id/rate-limit + B-24 over-cap guard; don't re-flag
+- [Over-cap parity vs random ids](overcap-parity-random-id-interaction.md) — B-23 random Space.Id breaks SPA position-based over-cap badging; server-authoritative, no bypass (Low/UX)

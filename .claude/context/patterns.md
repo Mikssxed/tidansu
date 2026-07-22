@@ -55,6 +55,18 @@ Read `AddZoneCommandHandler.cs` — it is the reference implementation. The orde
   every accidentally-safe `WHERE Id = @id` into a potential cross-tenant match.
   `SpacesRepository.RemoveItemAsync` is the exemplar: `i.SpaceId == spaceId` is written
   out even though the ownership `EXISTS` already implies it.
+- **A client-supplied id that is an FK *principal* can't be composite-keyed — server-assign
+  it instead.** B-22's `(SpaceId, Id)` fix does NOT transfer to `Space` (the tenancy root):
+  `Zone`/`Item` FK to `Spaces.Id`, so re-keying `Space` to `(UserId, Id)` would either keep
+  `Id` globally unique (re-opening the collision) or force adding `UserId` to both children.
+  B-23's answer: `Space.Id` is **server-assigned by `ISpaceIdGenerator`** (CSPRNG, Domain
+  interface + Infra impl), stays the sole PK, no migration. Ignore `dto.Id` on create.
+- **A per-account rate-limit policy must run `app.UseRateLimiter()` AFTER
+  `app.UseAuthentication()`/`UseAuthorization()` in `Program.cs`.** The partition
+  function reads `httpContext.User`, which is empty until authentication has run;
+  left before auth (as it was until B-23), the policy silently collapses to its IP
+  fallback. The existing IP-keyed policies (auth/magic-link/webhook) are unaffected
+  by this ordering either way — they key on `RemoteIpAddress`/a constant, not `User`.
 
 ---
 

@@ -13,6 +13,7 @@ public class AddZoneCommandHandler(
     ILogger<AddZoneCommandHandler> logger,
     ISpacesRepository spaces,
     IUserService userService,
+    SpaceOverCapGuard overCapGuard,
     IUserContext userContext) : IRequestHandler<AddZoneCommand, ZoneDto>
 {
     public async Task<ZoneDto> Handle(AddZoneCommand request, CancellationToken cancellationToken)
@@ -25,6 +26,12 @@ public class AddZoneCommandHandler(
         // else runs, including before any lock is taken.
         var currentZones = await spaces.CountZonesAsync(request.SpaceId, userId, cancellationToken)
             ?? throw new NotFoundException("Space", request.SpaceId);
+
+        // B-24: is the whole space one of the account's excess spaces? Runs BEFORE
+        // CheckAddZone so `spaces` wins the paywall reason when both would fire — the
+        // accurate remedy for a frozen over-cap space is "get under cap or upgrade",
+        // not "this space has too many zones".
+        await overCapGuard.EnsureSpaceContentWritableAsync(request.SpaceId, userId, cancellationToken);
 
         // Cheap pre-check, no lock: keeps the ordinary at-cap rejection at today's
         // latency (mirrors CreateSpaceCommandHandler). `before >= cap` is exactly

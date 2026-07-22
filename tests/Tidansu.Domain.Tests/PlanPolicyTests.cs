@@ -104,4 +104,22 @@ public class PlanPolicyTests
         Assert.Equal(expected, PlanPolicy.CheckItemPhotoChange(plan, change));
     }
 
+    // ---- Whole-space over-cap gate (B-24) -----------------------------------------
+    // Mirrors CheckAddZone_returns_expected's shape: precedingSpaceCount is the
+    // target space's 0-based rank in OrderBy(Id); Free cap is 2 (pinned above).
+    // Unlike the per-space count caps, this gate DOES apply to update/delete of a
+    // space's contents — it is a different question ("is this whole space over
+    // cap?"), not a weakening of the D-1 decomposition above.
+
+    [Theory]
+    [InlineData(Plan.Free, 0, null)]                       // rank 0 — under cap
+    [InlineData(Plan.Free, 1, null)]                       // rank 1 — under cap
+    [InlineData(Plan.Free, 2, PlanLimitReasons.Spaces)]     // rank 2 — at cap, over
+    [InlineData(Plan.Free, 3, PlanLimitReasons.Spaces)]     // rank 3 — over cap
+    [InlineData(Plan.Pro, 999, null)]                       // unlimited
+    public void CheckSpaceContentMutation_returns_expected(Plan plan, int precedingSpaceCount, string? expected)
+    {
+        Assert.Equal(expected, PlanPolicy.CheckSpaceContentMutation(plan, precedingSpaceCount));
+    }
+
 }

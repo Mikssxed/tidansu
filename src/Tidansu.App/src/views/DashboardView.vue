@@ -244,8 +244,11 @@
     }
 
     function openSpace(id: string) {
-        store.currentId = id;
-        router.push({ name: 'space', params: { id } });
+        // Uses the store's `goToSpace` for consistency with the create flow (B-23
+        // FR-6) — existing spaces already carry their server id, so no reconcile
+        // race applies here, but routing through one place avoids two copies of
+        // the same "navigate to a space" logic drifting apart.
+        store.goToSpace(id);
     }
 
     function onRename(id: string) {

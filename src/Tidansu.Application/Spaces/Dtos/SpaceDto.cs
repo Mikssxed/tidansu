@@ -40,4 +40,22 @@ public class SpaceDto
         Zones = [.. Zones.Select(z => z.ToEntity(Id))],
         Items = [.. Items.Select(i => i.ToEntity(Id))],
     };
+
+    // B-23: the create-a-space path must never trust dto.Id — it is server-assigned
+    // (see CreateSpaceCommandHandler + ISpaceIdGenerator). Identical to ToEntity(userId)
+    // above except the id comes from the caller, and every child zone/item is stamped
+    // with that same server-assigned spaceId rather than the client's Id.
+    public Space ToEntity(string userId, string spaceId) => new()
+    {
+        Id = spaceId,
+        UserId = userId,
+        Name = Name,
+        Type = Type,
+        ViewMode = ViewMode,
+        CanvasMode = CanvasMode,
+        LayoutColumns = LayoutColumns,
+        ColumnLabels = ColumnLabels is null ? null : [.. ColumnLabels],
+        Zones = [.. Zones.Select(z => z.ToEntity(spaceId))],
+        Items = [.. Items.Select(i => i.ToEntity(spaceId))],
+    };
 }

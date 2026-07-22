@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
@@ -26,6 +27,17 @@ public static class WebApplicationBuilderExtensions
     // meaningless here. A single shared fixed-window budget bounds a flood regardless
     // of source IP.
     public const string WebhookRateLimitPolicy = "billing-webhook";
+
+    // Per-account (not per-IP) fixed window for POST /api/spaces (B-23 FR-4). Space
+    // creation is unmetered on Pro (no space cap), which is what made the client-supplied
+    // low-entropy id squatting attack cheap; server-assigned ids (ISpaceIdGenerator) close
+    // the id-forgery angle, but unlimited unmetered creation is still open-ended resource-
+    // exhaustion abuse, so this is defense-in-depth on top of that fix. 20/min is looser
+    // than auth (10) / magic-link (3) because bulk/duplicate space creation is a legitimate
+    // user action. Requires app.UseRateLimiter() to run AFTER app.UseAuthentication() (see
+    // Program.cs) — otherwise httpContext.User is empty and this collapses to the IP
+    // fallback below, defeating the per-account partitioning (B-23 S-3).
+    public const string SpaceCreateRateLimitPolicy = "space-create";
 
     public const string FrontendCorsPolicy = "frontend";
 
@@ -146,6 +158,22 @@ public static class WebApplicationBuilderExtensions
                     _ => new FixedWindowRateLimiterOptions
                     {
                         PermitLimit = 60,
+                        Window = TimeSpan.FromMinutes(1)
+                    }));
+            // Per-account, not per-IP: an office/NAT shares one IP (which would wrongly
+            // share one budget across many users), and an authenticated attacker can rotate
+            // IPs to dodge an IP-keyed limit — the authenticated user id is the correct
+            // granularity for FR-4. Falls back to IP only if the request somehow reaches
+            // here unauthenticated (shouldn't happen behind [Authorize], but keeps the
+            // partition key non-null).
+            options.AddPolicy(SpaceCreateRateLimitPolicy, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    httpContext.User.FindFirst(c => c.Type == ClaimTypes.NameIdentifier)?.Value
+                        ?? httpContext.Connection.RemoteIpAddress?.ToString()
+                        ?? "unknown",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 20,
                         Window = TimeSpan.FromMinutes(1)
                     }));
         });

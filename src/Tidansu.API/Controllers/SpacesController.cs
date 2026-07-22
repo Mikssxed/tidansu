@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Tidansu.Application.Common;
 using Tidansu.Application.Spaces.Commands.CreateSpace;
 using Tidansu.Application.Spaces.Commands.DeleteSpace;
@@ -9,6 +10,7 @@ using Tidansu.Application.Spaces.Commands.UpdateSpaceFields;
 using Tidansu.Application.Spaces.Dtos;
 using Tidansu.Application.Spaces.Queries.GetSpace;
 using Tidansu.Application.Spaces.Queries.GetSpaces;
+using Tidansu.Extensions;
 using Tidansu.Models;
 
 namespace Tidansu.API.Controllers;
@@ -45,10 +47,14 @@ public class SpacesController(IMediator mediator) : ControllerBase
     // constraint. Because saves are whole-graph replaces, this also caps photographed
     // items per space at ~3 until B-16 moves photos off-row (B-13 D-9).
     [RequestSizeLimit(24 * 1024 * 1024)]
+    // Per-account fixed window (B-23 FR-4) — space creation has no plan cap on Pro, so it
+    // must still be metered to bound abuse independent of the id fix.
+    [EnableRateLimiting(WebApplicationBuilderExtensions.SpaceCreateRateLimitPolicy)]
     [ProducesResponseType<ApiOperationResult<SpaceDto>>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<Ok<ApiOperationResult<SpaceDto>>> CreateSpace([FromBody] SpaceDto space)
     {
         var result = await mediator.Send(new CreateSpaceCommand { Space = space });

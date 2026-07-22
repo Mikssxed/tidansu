@@ -126,10 +126,18 @@ app.UseStaticFiles();
 
 app.UseCors(WebApplicationBuilderExtensions.FrontendCorsPolicy);
 
-app.UseRateLimiter();
-
 app.UseAuthentication();
 app.UseAuthorization();
+
+// B-23 (S-3): must run AFTER UseAuthentication/UseAuthorization — the per-account
+// space-create policy partitions on httpContext.User, which is empty until
+// authentication has run. Left before auth (as it was until B-23), every request would
+// silently fall through to that policy's IP fallback, collapsing per-account limiting to
+// per-IP. Placing it here also means an unauthenticated caller is rejected by
+// [Authorize] before it can consume any per-account budget. The IP-keyed limiters (auth,
+// magic-link, billing-webhook) are unaffected by this move — they key on
+// RemoteIpAddress/a constant set by UseForwardedHeaders above, independent of auth.
+app.UseRateLimiter();
 
 app.MapControllers();
 

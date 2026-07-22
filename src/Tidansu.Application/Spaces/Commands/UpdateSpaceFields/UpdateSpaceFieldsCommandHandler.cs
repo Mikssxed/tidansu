@@ -10,6 +10,7 @@ namespace Tidansu.Application.Spaces.Commands.UpdateSpaceFields;
 public class UpdateSpaceFieldsCommandHandler(
     ILogger<UpdateSpaceFieldsCommandHandler> logger,
     ISpacesRepository spaces,
+    SpaceOverCapGuard overCapGuard,
     IUserContext userContext) : IRequestHandler<UpdateSpaceFieldsCommand, SpaceFieldsDto>
 {
     public async Task<SpaceFieldsDto> Handle(UpdateSpaceFieldsCommand request, CancellationToken cancellationToken)
@@ -23,10 +24,17 @@ public class UpdateSpaceFieldsCommandHandler(
         var existing = await spaces.GetByIdWithoutContentAsync(request.Id, userId, cancellationToken)
             ?? throw new NotFoundException("Space", request.Id);
 
-        // No plan gate here, and deliberately no IUserService/FindByIdAsync call to load
-        // one: renaming a space or changing its view/canvas mode moves no capped
-        // dimension (space count is only checked at creation) — see D-1. Do not add a
-        // check "to be safe"; there is no decision to make.
+        // B-24: is this whole space one of the account's excess spaces? Orthogonal to
+        // the per-space zone/item COUNT caps below (there are none here, deliberately —
+        // see next comment) — this rejects the update entirely when the space itself is
+        // over cap, regardless of what fields are being changed.
+        await overCapGuard.EnsureSpaceContentWritableAsync(request.Id, userId, cancellationToken);
+
+        // No per-space zone/item count gate here, and deliberately no separate
+        // IUserService/FindByIdAsync call to load one: renaming a space or changing its
+        // view/canvas mode moves no capped dimension (space count is only checked at
+        // creation) — see D-1. Do not add a check "to be safe"; there is no decision to
+        // make beyond the whole-space over-cap gate above.
         var dto = request.Fields;
         existing.Name = dto.Name;
         existing.Type = dto.Type;

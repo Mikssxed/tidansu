@@ -252,7 +252,9 @@
         if (!limits.guard(limits.checkAddSpace())) return;
         const space = seedForType(type.value, name.value.trim() || defaultName.value, complexity.value);
         store.addSpace(space);
-        store.currentId = space.id;
-        router.push({ name: 'space', params: { id: space.id } });
+        // B-23 FR-6 regression fix: navigate via the store's `goToSpace` (not a bare
+        // `router.push`) so `reconcileSpaceId` can reliably re-route once the server
+        // assigns the real id — see `goToSpace`'s doc.
+        store.goToSpace(space.id);
     }
 </script>

@@ -377,6 +377,29 @@ _Touch points:_ `src/Tidansu.App/src/stores/useSpacesStore.ts`,
 `src/Tidansu.App/src/components/base/BaseToast.vue`, `src/Tidansu.App/src/components/icons.ts`,
 `App.vue`.
 
+### [B-25] SPA over-cap badging can disagree with the server's read-only set
+**Priority**: P2
+**Status**: unprocessed
+Follow-up carved out of B-23/B-24 review (Low, cross-feature). The SPA marks which
+spaces are over-cap (read-only after downgrade) by **array position** —
+`spaces.slice(caps.spaces)` in `src/Tidansu.App/src/composables/useLimits.ts` — but
+B-23 switched `Space.Id` to server-assigned random ids, so the store's array order no
+longer tracks the server's authoritative `OrderBy(s => s.Id)` order, and
+`reconcileSpaceId` doesn't re-sort. The server (B-24) independently freezes exactly
+`total - caps.spaces` spaces by `OrderBy(Id)` every request, so **this is not a
+security bypass** — enforcement is correct regardless. But the SPA can *badge* a
+different set than the server actually makes read-only, so a user may see the wrong
+space greyed out (and try to edit a space the server will 403, or vice-versa). Make
+the SPA's over-cap selection agree with the server's: badge by the same stable
+`Id` order (sort by `Id` before slicing), or have the badge follow the server's
+truth. Verify by downgrading a multi-space account and confirming the badged spaces
+are exactly the ones whose mutations 403.
+_Touch points:_ `src/Tidansu.App/src/composables/useLimits.ts` (the `slice`-based
+over-cap selection), possibly `src/Tidansu.App/src/stores/useSpacesStore.ts`
+(ordering after `reconcileSpaceId`). See
+`docs/active/tasks/B-23-scoped-space-keys/security-review.md` § S-L1 and
+`docs/active/tasks/B-24-server-overcap-readonly/review.md`.
+
 ### [B-23] `Space.Id` is globally unique + client-supplied → the same cross-tenant DoS, one level up
 **Priority**: P1
 **Status**: unprocessed
@@ -508,7 +531,7 @@ language on purpose instead of by accident.
 _Touch points:_ `src/Tidansu.API/Program.cs` (culture config), possibly `Tidansu.API.csproj`
 (`InvariantGlobalization`); verify by driving a validation failure and checking the message language.
 
-### [B-23] Server-side enforcement of read-only over-cap content after downgrade
+### [B-24] Server-side enforcement of read-only over-cap content after downgrade
 **Priority**: P2
 **Status**: unprocessed
 Follow-up carved out of B-17. B-17 makes over-cap spaces read-only **in the SPA only** — it disables

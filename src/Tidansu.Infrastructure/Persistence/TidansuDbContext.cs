@@ -54,6 +54,26 @@ public class TidansuDbContext(DbContextOptions<TidansuDbContext> options) : Iden
             evt.Property(e => e.Type).HasMaxLength(64);
         });
 
+        // Space.Id stays the SOLE, globally-unique primary key (no HasKey call — EF
+        // convention keys on Id alone), unlike Zone/Item below which take a composite
+        // (SpaceId, Id) key. That is deliberate, not an oversight: Space is the FK
+        // PRINCIPAL for Zone.SpaceId/Item.SpaceId (see HasMany(...).WithOne(...) below), and
+        // a SQL Server FK must reference a primary key or unique constraint on the
+        // principal column(s) — re-keying Space to (UserId, Id) would either keep a
+        // separate UNIQUE index on Id (re-imposing the exact global uniqueness this
+        // paragraph is about) or force adding+backfilling a UserId column on both Zone and
+        // Item to rewire their FKs, an invasive data migration for no gain. See B-23
+        // tech-tasks § 0 for the full elimination of that option.
+        //
+        // As of B-23, the VALUE in this column is server-assigned by ISpaceIdGenerator
+        // (a CSPRNG) rather than client-supplied. That is what closes, at the tenancy
+        // root, the same class of cross-tenant collision/DoS/existence-oracle that the
+        // composite key on Zone/Item (below) closes one level down (B-22 § S-H1): before
+        // B-23, a client could choose Space.Id, so it could squat another tenant's
+        // low-entropy predicted id and force their space creation to a collision/500.
+        // Do not read the B-22 comments on Zone/Item's composite key, or the D-3/D-4
+        // ownership-scoping comments in SpacesRepository, as implying this was already
+        // closed for Space — it was not, until this change.
         modelBuilder.Entity<Space>(space =>
         {
             space.Property(s => s.Id).HasMaxLength(64);

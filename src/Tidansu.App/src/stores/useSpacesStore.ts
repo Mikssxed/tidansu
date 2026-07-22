@@ -21,6 +21,7 @@ import type { Item, Rect, Space, ViewMode, Zone, ZoneKind } from '@/data/types';
 import { queryClient, spaceContentsKey, spacesQueryKey } from '@/queryClient';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
+import { useRouter } from 'vue-router';
 
 /** Spaces-summary page size (matches the API controller's default, see B-16). */
 const PAGE_SIZE = 20;
@@ -65,6 +66,7 @@ export const useSpacesStore = defineStore('spaces', () => {
     // Build the client eagerly so the bearer token is read per-request at call time.
     useApiClient();
     const api = useSpacesApi();
+    const router = useRouter();
 
     const spaces = ref<Space[]>([]);
     const currentId = ref<string | null>(null);
@@ -83,6 +85,31 @@ export const useSpacesStore = defineStore('spaces', () => {
     const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
     const changeSets = new Map<string, ChangeSet>();
     const inFlight = new Set<string>();
+    /** Spaces whose whole-space `POST /api/spaces` create hasn't resolved yet (B-23 FR-6).
+     * The server now assigns `Space.Id`, so a space keyed by its local optimistic id here
+     * has no server-known id yet — `flush` must not send anything for it (see `flush`'s
+     * gate and `reconcileSpaceId`, which releases the gate once the real id is known). */
+    const creatingSpaces = new Set<string>();
+    /**
+     * The space id the app most recently *asked* the space route to navigate to
+     * (B-23 FR-6 regression fix — confirmed live: create wizard → permanent
+     * "Loading…"). Set synchronously by `goToSpace`, never derived from
+     * `router.currentRoute`.
+     *
+     * `router.push`/`router.replace` resolve asynchronously (route guards, lazy
+     * chunk loads, etc.). `reconcileSpaceId` originally decided whether to
+     * re-route by reading `router.currentRoute.value` at the moment the create
+     * request resolved — but a fast API response can beat that navigation to
+     * settling, so `currentRoute` still reflected the *previous* page (the
+     * onboarding wizard), the "are we currently showing oldId" check came back
+     * false, `reconcileSpaceId` skipped its `router.replace`, and the wizard's
+     * own earlier `router.push(oldId)` landed afterwards — permanently, since by
+     * then `space.id` had already flipped to the server id and nothing in the
+     * store carried `oldId` any more. Tracking the *intent* here instead of the
+     * *settled* route makes the check immune to how far that navigation has
+     * actually progressed.
+     */
+    let spaceRouteTarget: string | null = null;
     /** Per-mutation save status, keyed by entity id (or `space:{id}` for scalars). */
     const saveState = ref<Map<string, { status: 'pending' | 'saved' | 'failed'; reason: PaywallReason | null }>>(
         new Map()
@@ -198,10 +225,12 @@ export const useSpacesStore = defineStore('spaces', () => {
         saveTimers.delete(spaceId);
         changeSets.delete(spaceId);
         inFlight.delete(spaceId);
+        creatingSpaces.delete(spaceId);
         saveState.value.delete(`space:${spaceId}`);
         contentsLoaded.value.delete(spaceId);
         contentsLoading.value.delete(spaceId);
         contentsFailed.value.delete(spaceId);
+        if (spaceRouteTarget === spaceId) spaceRouteTarget = null;
     }
 
     /**
@@ -405,8 +434,16 @@ export const useSpacesStore = defineStore('spaces', () => {
      * that skips it (an early return, a throw) wedges this space's autosave
      * permanently, since every later flush would see `inFlight` still set and just
      * re-arm forever without ever sending.
+     *
+     * B-23 FR-6: a space whose whole-space create hasn't resolved yet has no
+     * server-known id — sending against `spaceId` here would be the local optimistic
+     * id, which 404s. Rather than re-arming (its closure would keep retrying against
+     * the same stale id forever), this simply declines to flush; `reconcileSpaceId`
+     * (called from `createRemote`'s success path) re-schedules a fresh flush under the
+     * real id once it is known, so nothing staged during the gate is lost.
      */
     async function flush(spaceId: string): Promise<void> {
+        if (creatingSpaces.has(spaceId)) return;
         if (inFlight.has(spaceId)) {
             scheduleSave(spaceId);
             return;
@@ -439,8 +476,129 @@ export const useSpacesStore = defineStore('spaces', () => {
         );
     }
 
+    /** Move a `Set`'s membership from one key to another, if present. */
+    function moveSetEntry(set: Set<string>, oldId: string, newId: string): void {
+        if (!set.has(oldId)) return;
+        set.delete(oldId);
+        set.add(newId);
+    }
+
+    /**
+     * B-23 FR-6: the server now assigns `Space.Id` on create and ignores whatever local,
+     * low-entropy `uid('space')` the optimistic push used — so once `createRemote`'s
+     * create resolves, every place the store (and the current route) keys by that local
+     * id must adopt the real one.
+     *
+     * `saveTimers`/`changeSets` are handled differently from the other maps: a timer
+     * already scheduled under `oldId` captured `oldId` in its closure, so moving the map
+     * entry alone would leave it calling `flush(oldId)` after the changeset has moved to
+     * `newId` — it would find nothing to send and the staged edit would go unflushed
+     * indefinitely (see `flush`'s creating-gate doc). Instead any pending timer is
+     * cancelled outright, and if the moved changeset is non-empty, a fresh save is
+     * scheduled under `newId` — the only variant with a closure that flushes the right id.
+     *
+     * B-23 review M1: the route is reconciled to `newId` *before* `space.id` itself
+     * flips (see the `await router.replace` below), and it is awaited rather than
+     * fire-and-forget. SpaceView keys `space = getById(props.id)` off the route
+     * param; if `space.id` mutated first, `space` would go transiently `undefined`
+     * (`getById(oldId)` no longer matches anything) while the route/`props.id` still
+     * read `oldId` — Vue's reactive flush for that mutation runs (microtask) well
+     * before router's async navigation resolves, so SpaceView's "space vanished"
+     * watch would see `lastKnownId.value === props.id` (both still `oldId`) and
+     * bounce the user to the dashboard right after they created the space. Landing
+     * the route on `newId` first means `props.id` already reads `newId` when
+     * `space.id` flips, so `getById(props.id)` finds it on the very next reactive
+     * pass instead of missing it — and the earlier "route changed, store hasn't
+     * caught up yet" moment fails that same `lastKnownId` check for the opposite
+     * reason (ids no longer match), so it doesn't bounce either. Every other
+     * space-keyed map is moved to `newId` before the navigation, not after, so the
+     * contents-fetch watch that reruns on the `props.id` change (see SpaceView)
+     * sees `newId` already marked loaded and does not spuriously re-fetch it.
+     *
+     * **FR-6 regression fix (confirmed live drive: permanent "Loading…" after
+     * onboarding create).** M1's original guard read `router.currentRoute.value`
+     * to decide whether to re-route — but that reflects the *settled* navigation,
+     * not the *intended* one. `CreateSpaceView` calls `goToSpace(localId)`
+     * (`router.push`, which resolves asynchronously) and this function can run
+     * before that push has settled — observed live, where the API response beat
+     * the router's own navigation. At that moment `currentRoute` still named the
+     * onboarding wizard, the check came back false, the `router.replace` below
+     * never fired, and the wizard's own `push(oldId)` landed afterwards — for
+     * good, since by then `space.id` already read `newId` and nothing in the
+     * store answered to `oldId`. This now checks `spaceRouteTarget`, a flag
+     * `goToSpace` sets synchronously the instant navigation is *requested* —
+     * immune to how far the router has actually gotten.
+     */
+    async function reconcileSpaceId(oldId: string, newId: string): Promise<void> {
+        if (oldId === newId) return;
+
+        moveSetEntry(contentsLoaded.value, oldId, newId);
+        moveSetEntry(contentsLoading.value, oldId, newId);
+        moveSetEntry(contentsFailed.value, oldId, newId);
+        moveSetEntry(inFlight, oldId, newId);
+
+        const scalarState = saveState.value.get(scalarKey(oldId));
+        if (scalarState) {
+            saveState.value.delete(scalarKey(oldId));
+            saveState.value.set(scalarKey(newId), scalarState);
+        }
+
+        const timer = saveTimers.get(oldId);
+        if (timer) {
+            clearTimeout(timer);
+            saveTimers.delete(oldId);
+        }
+        const cs = changeSets.get(oldId);
+        if (cs) changeSets.delete(oldId);
+        if (cs) changeSets.set(newId, cs);
+
+        if (currentId.value === oldId) currentId.value = newId;
+
+        // The onboarding flow navigates straight to `/spaces/{localId}` via `goToSpace`
+        // — without this, the route would keep pointing at an id no space in the store
+        // carries anymore, and SpaceView's "space vanished" watch would bounce the user
+        // back to the dashboard right after they created it. Checked against the
+        // navigation *intent* (`spaceRouteTarget`), not the settled route — see the
+        // FR-6 regression note above.
+        if (spaceRouteTarget === oldId) {
+            spaceRouteTarget = newId;
+            try {
+                await router.replace({ name: 'space', params: { id: newId } });
+            } catch (e) {
+                console.error('[spaces] failed to reconcile route to server id', e);
+            }
+        }
+
+        const space = spaces.value.find((s) => s.id === oldId);
+        if (space) space.id = newId;
+
+        if (cs && !isEmpty(cs)) scheduleSave(newId);
+    }
+
+    /**
+     * Whole-space create (B-23 FR-6). The server assigns and returns the authoritative
+     * `Space.Id`, ignoring the client's optimistic `uid('space')`. The optimistic push
+     * into `spaces.value` already happened synchronously in the caller (`addSpace`/
+     * `duplicateSpace`/the starter seed) — this only sends the request and, once it
+     * resolves, adopts the server id via `reconcileSpaceId`.
+     *
+     * `creatingSpaces` gates `flush` for this space for the lifetime of the request —
+     * any edit staged in that window still lands (see `reconcileSpaceId`'s reschedule),
+     * it just can't be sent before the space's real id is known.
+     */
     function createRemote(space: Space): void {
-        void api.create(space).catch((e) => handleCreateError(space, e));
+        const localId = space.id;
+        creatingSpaces.add(localId);
+        void api
+            .create(space)
+            .then((created) => {
+                creatingSpaces.delete(localId);
+                void reconcileSpaceId(localId, created.id);
+            })
+            .catch((e) => {
+                creatingSpaces.delete(localId);
+                handleCreateError(space, e);
+            });
     }
     function deleteRemote(id: string): void {
         const pending = saveTimers.get(id);
@@ -591,6 +749,7 @@ export const useSpacesStore = defineStore('spaces', () => {
         saveTimers.clear();
         changeSets.clear();
         inFlight.clear();
+        creatingSpaces.clear();
         saveState.value.clear();
         saveMessage.value = null;
         spaces.value = [];
@@ -608,6 +767,19 @@ export const useSpacesStore = defineStore('spaces', () => {
     }
 
     // ---- spaces ----
+
+    /**
+     * Navigate to a space's route, recording the navigation *intent* synchronously
+     * (B-23 FR-6 regression fix) so `reconcileSpaceId` can re-route correctly even
+     * if it runs before this `router.push` has settled — see `spaceRouteTarget`
+     * and `reconcileSpaceId`'s doc. Callers (`CreateSpaceView`, `DashboardView`)
+     * must use this instead of calling `router.push` themselves for the space route.
+     */
+    function goToSpace(id: string): void {
+        spaceRouteTarget = id;
+        currentId.value = id;
+        void router.push({ name: 'space', params: { id } });
+    }
 
     /** Append a freshly built space (from the onboarding flow). Returns its id. */
     function addSpace(space: Space): string {
@@ -844,6 +1016,7 @@ export const useSpacesStore = defineStore('spaces', () => {
         isContentsLoaded,
         isContentsFailed,
         reset,
+        goToSpace,
         addSpace,
         renameSpace,
         duplicateSpace,

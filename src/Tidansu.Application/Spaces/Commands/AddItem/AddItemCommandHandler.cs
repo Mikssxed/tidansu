@@ -13,6 +13,7 @@ public class AddItemCommandHandler(
     ILogger<AddItemCommandHandler> logger,
     ISpacesRepository spaces,
     IUserService userService,
+    SpaceOverCapGuard overCapGuard,
     IUserContext userContext) : IRequestHandler<AddItemCommand, ItemDto>
 {
     public async Task<ItemDto> Handle(AddItemCommand request, CancellationToken cancellationToken)
@@ -32,6 +33,12 @@ public class AddItemCommandHandler(
         // check — ZoneId has no FK (see Item.cs), so this is enforced here, not by the DB.
         if (!await spaces.ZoneExistsInSpaceAsync(request.SpaceId, dto.ZoneId, userId, cancellationToken))
             throw new NotFoundException("Zone", dto.ZoneId);
+
+        // B-24: is the whole space one of the account's excess spaces? Runs after both
+        // not-found checks above (owner-scoping and the referenced-zone check keep
+        // precedence) and BEFORE CheckAddItem/the photo gate, so `spaces` wins the
+        // paywall reason when several would fire.
+        await overCapGuard.EnsureSpaceContentWritableAsync(request.SpaceId, userId, cancellationToken);
 
         // Plan gate BEFORE SpacePhotoGuard and before any mutation of tracked state (T-13
         // rule 3 / B-13 D-8.2): a Free user sending a photo — valid or invalid — must get

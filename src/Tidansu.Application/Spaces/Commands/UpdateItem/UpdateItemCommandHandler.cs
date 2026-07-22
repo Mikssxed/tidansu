@@ -13,6 +13,7 @@ public class UpdateItemCommandHandler(
     ILogger<UpdateItemCommandHandler> logger,
     ISpacesRepository spaces,
     IUserService userService,
+    SpaceOverCapGuard overCapGuard,
     IUserContext userContext) : IRequestHandler<UpdateItemCommand, ItemDto>
 {
     public async Task<ItemDto> Handle(UpdateItemCommand request, CancellationToken cancellationToken)
@@ -36,6 +37,12 @@ public class UpdateItemCommandHandler(
         {
             throw new NotFoundException("Zone", dto.ZoneId);
         }
+
+        // B-24: is the whole space one of the account's excess spaces? Runs after both
+        // not-found checks above and BEFORE the photo gate below, so a Free user
+        // editing an item in an over-cap space gets {plan:['spaces']}, not
+        // {plan:['photos']} — the accurate remedy for a frozen space.
+        await overCapGuard.EnsureSpaceContentWritableAsync(request.SpaceId, userId, cancellationToken);
 
         // TRAP (T-13e): read item.Photo into a local BEFORE assigning anything from the
         // DTO below. Assigning first and then comparing item.Photo (now equal to

@@ -36,6 +36,19 @@ export const ZONE_TEMPLATES: Record<SpaceTypeId, ZoneTemplate[]> = {
     other: [{}, {}],
 };
 
+/**
+ * B-23: deliberately left unchanged for `uid('space')`. Its low entropy was the
+ * root of the cross-tenant DoS this task closed, but the fix was to make the
+ * *server* ignore whatever id the client sends and assign a CSPRNG one instead —
+ * not to strengthen the client's generator. `uid('space')` is still needed
+ * as a transient local handle for the optimistic push (onboarding/duplicate/
+ * starter seed): `useSpacesStore.createRemote` reconciles it to the real
+ * server-assigned id once the create resolves (see `reconcileSpaceId`), so its
+ * predictability no longer matters — the server never trusts it. Removing or
+ * hardening it here would be a no-op for security and would only churn every
+ * other `uid(...)` caller (zone/item ids), which stay untouched — that's B-22's
+ * already-closed territory.
+ */
 let _id = 0;
 export const uid = (p = 'id'): string =>
     `${p}_${(++_id).toString(36)}${Date.now().toString(36).slice(-3)}`;

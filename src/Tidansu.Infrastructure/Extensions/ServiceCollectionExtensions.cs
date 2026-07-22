@@ -144,6 +144,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IRefreshTokensRepository, RefreshTokensRepository>();
         services.AddScoped<IMagicLinkTokensRepository, MagicLinkTokensRepository>();
         services.AddScoped<ISpacesRepository, SpacesRepository>();
+
+        // Stateless CSPRNG id minting (B-23) — safe as a singleton.
+        services.AddSingleton<ISpaceIdGenerator, SpaceIdGenerator>();
     }
 
     // Returns a required SMTP setting or throws a fail-loud InvalidOperationException

@@ -10,6 +10,7 @@ namespace Tidansu.Application.Spaces.Commands.UpdateZone;
 public class UpdateZoneCommandHandler(
     ILogger<UpdateZoneCommandHandler> logger,
     ISpacesRepository spaces,
+    SpaceOverCapGuard overCapGuard,
     IUserContext userContext) : IRequestHandler<UpdateZoneCommand, ZoneDto>
 {
     public async Task<ZoneDto> Handle(UpdateZoneCommand request, CancellationToken cancellationToken)
@@ -21,10 +22,16 @@ public class UpdateZoneCommandHandler(
         var zone = await spaces.GetZoneAsync(request.SpaceId, request.ZoneId, userId, cancellationToken)
             ?? throw new NotFoundException("Zone", request.ZoneId);
 
-        // No plan gate here, deliberately: no zone field moves a capped dimension
-        // (D-1 — updates never change a count, so CheckSpaceMutation's `after > before`
-        // conjunct is always false). This is what keeps a downgraded Free user able to
-        // edit their over-cap zones. Do not add a `count >= cap` check here.
+        // B-24: is the whole space one of the account's excess spaces? Orthogonal to
+        // the per-zone count gate below (there is none, deliberately — see next
+        // comment); this rejects the update entirely when the space itself is over cap.
+        await overCapGuard.EnsureSpaceContentWritableAsync(request.SpaceId, userId, cancellationToken);
+
+        // No per-zone count gate here, deliberately: no zone field moves a capped
+        // dimension (D-1 — updates never change a count, so CheckSpaceMutation's
+        // `after > before` conjunct is always false). This is what keeps a downgraded
+        // Free user able to edit their under-cap zones. Do not add a `count >= cap`
+        // check here — the over-cap gate above is the only gate this update needs.
         var dto = request.Zone;
         zone.Label = dto.Label;
         zone.Color = dto.Color;
