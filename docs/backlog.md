@@ -434,6 +434,21 @@ _Touch points:_ future sync store/composable;
 `src/Tidansu.App/src/stores/useSpacesStore.ts` (`refreshOverCapFlags`).
 See `docs/active/tasks/B-25-overcap-badge-parity/tech-tasks.md` (deferred Q2).
 
+### [B-28] CI check: fail a PR when the committed Kiota client drifts from a fresh regen
+**Priority**: P3
+**Status**: unprocessed
+Split out of B-21 (a process suggestion from its requirements stage, not part of
+that item's scope). Once `npm run build:api` reliably regenerates the frontend's
+API client in one command (B-21), a stale committed client becomes a silent
+correctness trap: a backend contract change that nobody regenerates leaves the
+SPA calling the old shape with no signal until runtime. Add a CI step that runs a
+fresh client regen and fails the build if `git diff` on the generated client is
+non-empty — turning "someone forgot to regen" into a red check instead of a
+latent bug. Depends on B-21 landing first (the regen must be a reliable,
+scriptable one-liner before CI can lean on it).
+_Touch points:_ CI workflow config; the `build:api` script chain from B-21.
+See `docs/active/tasks/B-21-fix-build-api-swagger/requirements.md`.
+
 ### [B-23] `Space.Id` is globally unique + client-supplied → the same cross-tenant DoS, one level up
 **Priority**: P1
 **Status**: ✅ done (2026-07-23 — server-assigned CSPRNG `Space.Id` + per-account rate limit + store/route reconcile; both-reviewer'd clean, FR-6 verified via live browser drive; see `docs/active/tasks/B-23-scoped-space-keys/`. Residual parity item filed as B-25.)
@@ -522,7 +537,18 @@ _Touch points:_ `src/Tidansu.Infrastructure/Persistence/TidansuDbContext.cs`, a 
 
 ### [B-21] Fix `npm run build:api` — `swagger tofile` can't find a `Startup`
 **Priority**: P3
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-23 — built, driven & reviewed; see
+`docs/active/tasks/B-21-fix-build-api-swagger/`. `swagger tofile` replaced with build-time
+OpenAPI generation via `Microsoft.Extensions.ApiDescription.Server` (getdocument), off by
+default (`OpenApiGenerateDocumentsOnBuild=false`) and opted into only by the regen script;
+`kiota` pinned in `.config/dotnet-tools.json` (script self-runs `dotnet tool restore`). One
+command, zero manual steps, no running app/curl. **FR-3 fidelity proven**: `npm run build:api`
+run twice → empty `git diff src/api/` both times (byte-identical client + idempotent). Review:
+0 🔴, 1 🟠 (M1: generation ran `Program.cs` to the migration block and touched LocalDB,
+contradicting the "no DB" doc claim) — fixed inline by forcing `ConnectionStrings__TidansuDb=`
+empty so the guard skips; 2 of 3 Minors fixed (friendly copy-script guard, self-run tool
+restore). `kiota-regen-tooling` memory note rewritten. CI drift-check split out as **B-28**.
+Changes left uncommitted.)
 The documented way to regenerate the frontend's API client (`npm run build:api` in
 `src/Tidansu.App`) has never actually worked. Its first step, `build:api-file`
 (`swagger tofile … Tidansu.API.dll v1`), fails with *"A type named 'Startup' could not be found"* —
