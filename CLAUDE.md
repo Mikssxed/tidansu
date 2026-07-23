@@ -24,6 +24,12 @@ npm run build       # vue-tsc type-check + build to ../Tidansu.API/wwwroot
 npm run build:api   # regenerate Kiota client from backend swagger (backend phases)
 ```
 - `VITE_DISABLE_AUTH=true` in `.env` bypasses route auth guards during dev.
+- **Regenerating the API client:** `npm run build:api` is a single, zero-manual-step
+  command — build-time OpenAPI generation (`Microsoft.Extensions.ApiDescription.Server`,
+  off by default, opted into by this script) emits Swashbuckle's own doc with no
+  running host, no DB migration curl, no manual steps. The only prerequisite is
+  `dotnet tool restore` (repo root) once per clone, which pins the exact `kiota` CLI
+  version via `.config/dotnet-tools.json` — no global tool install needed.
 
 ### Backend (run from `src/Tidansu.API`)
 ```bash

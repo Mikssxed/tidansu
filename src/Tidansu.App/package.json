@@ -9,9 +9,9 @@
         "preview": "vite preview",
         "test": "vitest run",
         "build:api": "npm run build:api-file && npm run build:api-fix && npm run build:api-client && npm run build:api-patch",
-        "build:api-file": "swagger tofile --output ./src/api/api.json ../Tidansu.API/bin/Debug/net10.0/Tidansu.API.dll v1",
+        "build:api-file": "cross-env ASPNETCORE_ENVIRONMENT=Development ConnectionStrings__TidansuDb= dotnet build ../Tidansu.API/Tidansu.API.csproj -c Debug -p:OpenApiGenerateDocumentsOnBuild=true && node ./src/api/copy-openapi.mjs",
         "build:api-fix": "node ./src/api/fix-openapi.mjs",
-        "build:api-client": "kiota generate --language typescript --openapi ./src/api/api.json --class-name apiClient --output ./src/api/apiClient --clean-output",
+        "build:api-client": "dotnet tool restore && dotnet tool run kiota generate --language typescript --openapi ./src/api/api.json --class-name apiClient --output ./src/api/apiClient --clean-output",
         "build:api-patch": "node ./src/api/fix-generated.mjs"
     },
     "dependencies": {
@@ -39,6 +39,7 @@
         "@types/node": "^24.10.1",
         "@vitejs/plugin-vue": "^6.0.1",
         "@vue/tsconfig": "^0.8.1",
+        "cross-env": "^10.1.0",
         "prettier": "3.8.1",
         "typescript": "~5.9.3",
         "vite": "^7.2.4",

@@ -8,9 +8,27 @@
     <PreserveCompilationContext>true</PreserveCompilationContext>
   </PropertyGroup>
 
+  <!-- B-21: build-time OpenAPI doc emission for the Kiota regen (npm run build:api).
+       OnBuild=false keeps normal `dotnet build` / `npm run build` untouched (FR-5);
+       the regen script opts in with -p:OpenApiGenerateDocumentsOnBuild=true. -->
+  <PropertyGroup>
+    <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
+    <OpenApiGenerateDocumentsOnBuild>false</OpenApiGenerateDocumentsOnBuild>
+    <OpenApiDocumentsDirectory>$(MSBuildProjectDirectory)/obj/openapi</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOptions>--file-name api</OpenApiGenerateDocumentsOptions>
+  </PropertyGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <!-- B-21: build-time emission of Swashbuckle's own OpenAPI doc via getdocument,
+         resolving the host through HostFactoryResolver (the same mechanism `dotnet ef`
+         already uses against this minimal-hosting Program.cs) — no running host, no DB.
+         Build-only tooling: PrivateAssets="all" keeps it out of the runtime output. -->
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.9">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
