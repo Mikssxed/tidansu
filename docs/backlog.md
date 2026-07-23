@@ -548,7 +548,7 @@ run twice → empty `git diff src/api/` both times (byte-identical client + idem
 contradicting the "no DB" doc claim) — fixed inline by forcing `ConnectionStrings__TidansuDb=`
 empty so the guard skips; 2 of 3 Minors fixed (friendly copy-script guard, self-run tool
 restore). `kiota-regen-tooling` memory note rewritten. CI drift-check split out as **B-28**.
-Changes left uncommitted.)
+Committed + pushed to `origin/main` (`8cc4198` code, `8e50395` docs, `4b8d823` checklist).)
 The documented way to regenerate the frontend's API client (`npm run build:api` in
 `src/Tidansu.App`) has never actually worked. Its first step, `build:api-file`
 (`swagger tofile … Tidansu.API.dll v1`), fails with *"A type named 'Startup' could not be found"* —
