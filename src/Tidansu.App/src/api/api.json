@@ -978,6 +978,26 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Too Many Requests",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
           }
         }
       }
@@ -2145,12 +2165,16 @@
             "items": {
               "type": "string"
             }
+          },
+          "isOverCap": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false,
         "required": [
           "canvasMode",
           "id",
+          "isOverCap",
           "itemCount",
           "layoutColumns",
           "name",

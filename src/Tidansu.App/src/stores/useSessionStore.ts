@@ -58,6 +58,16 @@ export const useSessionStore = defineStore('session', () => {
     const proAccessUntil = ref<string | null>(persisted.proAccessUntil ?? null);
     /** Transient, user-visible message when a plan change fails (e.g. billing off). */
     const billingMessage = ref<string | null>(null);
+    /**
+     * Bumped once `setPlan`'s billing round-trip has fully settled (`.then` **and**
+     * `.catch`, after every reconciliation branch) — never on the optimistic flip
+     * itself. `useSpacesStore` watches this alongside `plan` (B-25 M1) so its
+     * over-cap-flag refresh runs against the server's committed plan instead of
+     * racing the in-flight `POST /api/account` — a same-tick optimistic flip could
+     * otherwise be re-fetched before the change actually landed. Not persisted:
+     * it's a same-session settlement pulse, not durable state.
+     */
+    const planChangeEpoch = ref(0);
 
     watch(
         [user, syncOn, cancellationScheduled, proAccessUntil],
@@ -153,6 +163,13 @@ export const useSessionStore = defineStore('session', () => {
                 if (user.value) user.value.plan = previous;
                 billingMessage.value = BILLING_UNAVAILABLE_MESSAGE;
                 console.error('[session] plan change failed', e);
+            })
+            .finally(() => {
+                // Settlement pulse (B-25 M1) — fires after every branch above (success,
+                // checkout redirect, scheduled-cancel revert, or error revert) has
+                // already applied its own plan value, so watchers keyed on this epoch
+                // always see the post-settlement plan.
+                planChangeEpoch.value++;
             });
     }
 
@@ -180,6 +197,7 @@ export const useSessionStore = defineStore('session', () => {
         proAccessUntil,
         proAccessUntilLabel,
         billingMessage,
+        planChangeEpoch,
         setUser,
         signOut,
         setPlan,

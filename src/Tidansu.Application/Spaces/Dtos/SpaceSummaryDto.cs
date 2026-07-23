@@ -18,7 +18,14 @@ public class SpaceSummaryDto
     public int ItemCount { get; set; }
     public List<string> PreviewColors { get; set; } = [];
 
-    public static SpaceSummaryDto FromSummary(SpaceSummary s) => new()
+    // B-25: server-authoritative "this whole space is one of the account's excess
+    // spaces and is read-only" — computed in GetSpacesQueryHandler with the SAME
+    // PlanPolicy.CheckSpaceContentMutation predicate SpaceOverCapGuard enforces
+    // with. The SPA must badge from this and never derive over-cap from position
+    // or id order.
+    public bool IsOverCap { get; set; }
+
+    public static SpaceSummaryDto FromSummary(SpaceSummary s, bool isOverCap) => new()
     {
         Id = s.Id,
         Name = s.Name,
@@ -30,5 +37,6 @@ public class SpaceSummaryDto
         ZoneCount = s.ZoneCount,
         ItemCount = s.ItemCount,
         PreviewColors = [.. s.PreviewColors],
+        IsOverCap = isOverCap,
     };
 }

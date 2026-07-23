@@ -18,9 +18,11 @@ import {
 import { seedFridge } from '@/data/seed';
 import { flowFreeform, makeZone, summarize, uid } from '@/data/spaces';
 import type { Item, Rect, Space, ViewMode, Zone, ZoneKind } from '@/data/types';
+import { isInf } from '@/data/plans';
 import { queryClient, spaceContentsKey, spacesQueryKey } from '@/queryClient';
+import { useSessionStore } from '@/stores/useSessionStore';
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 /** Spaces-summary page size (matches the API controller's default, see B-16). */
@@ -67,6 +69,7 @@ export const useSpacesStore = defineStore('spaces', () => {
     useApiClient();
     const api = useSpacesApi();
     const router = useRouter();
+    const session = useSessionStore();
 
     const spaces = ref<Space[]>([]);
     const currentId = ref<string | null>(null);
@@ -82,6 +85,13 @@ export const useSpacesStore = defineStore('spaces', () => {
      * still current when its fetch resolves may write `hydrateStatus`/`hydrated`/`spaces`
      * or fire the seed. `reset()` bumps it so an orphaned call can't re-arm anything. */
     let hydrateEpoch = 0;
+    /** Set when `refreshOverCapFlags()` is asked to run while a `hydrate()` is in
+     * flight (B-25 review N1) — its own fetch might have been sent *before* the plan
+     * change that triggered this call, so dropping the request outright can leave the
+     * badge set stale. Replayed once `hydrateStatus` next leaves `'loading'` (see the
+     * watch below); `refreshOverCapFlags` re-validates `hydrated`/`hydrateStatus`
+     * itself at that point, so a replay after a failed/no-op hydrate is a safe no-op. */
+    let pendingFlagRefresh = false;
     const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
     const changeSets = new Map<string, ChangeSet>();
     const inFlight = new Set<string>();
@@ -600,12 +610,19 @@ export const useSpacesStore = defineStore('spaces', () => {
                 handleCreateError(space, e);
             });
     }
+    /** A deleted space can pull a badged sibling back under cap (B-25 FR-3) — refresh
+     * the over-cap flags once the delete lands; skipped on Pro (`isInf`), where no
+     * space can ever be badged. */
+    function onSpaceDeleted(): void {
+        if (!isInf(session.caps.spaces)) void refreshOverCapFlags();
+    }
+
     function deleteRemote(id: string): void {
         const pending = saveTimers.get(id);
         if (pending) clearTimeout(pending);
         saveTimers.delete(id);
         changeSets.delete(id); // staged edits for a deleted space must never flush
-        void api.remove(id).catch(handleDeleteError);
+        void api.remove(id).then(onSpaceDeleted).catch(handleDeleteError);
     }
 
     /**
@@ -696,6 +713,90 @@ export const useSpacesStore = defineStore('spaces', () => {
             loadingMore = false;
         }
     }
+
+    /**
+     * FR-3 freshness action (B-25): re-fetch every summaries page already loaded and
+     * merge only `overCap` (+ `total`) into the *existing* `Space` objects by id —
+     * never push, remove, or replace one. This is what `hydrate(true)` is not allowed
+     * to be here: a full re-sync replaces every `Space` object, and a `ChangeSet`
+     * staged against an object this discarded would still flush and land silently
+     * (the M2 hazard documented on `handleCreateError`). Merging by id sidesteps that
+     * entirely — every object identity the rest of the store (and any in-flight
+     * `ChangeSet`) already holds stays valid.
+     *
+     * A `hydrate()` already in flight defers this call instead of dropping it (see
+     * `pendingFlagRefresh`, B-25 review N1) — its request may have been sent before
+     * the event that triggered this refresh, so it can't be assumed to carry fresh
+     * flags. No-ops (no defer either) when the store has never hydrated at all — there
+     * is nothing local to merge into yet, and the next real `hydrate()` brings correct
+     * flags from scratch.
+     *
+     * Captures `hydrateEpoch` before its first `await` and bails after every page's
+     * `await` if it changed (B-25 review N2 — same pattern as `hydrate`'s own B-18 M1
+     * guard): a `reset()` (sign-out) or a forced `hydrate()` starting mid-loop must not
+     * let a late response merge stale flags onto post-reset/-rehydrate objects, or
+     * stomp a newer `total`.
+     *
+     * Writes each refetched page back into the TanStack cache (B-25 review N3, same as
+     * `hydrate(force)`) so `spacesQueryKey(page)` can't keep serving pre-refresh flags
+     * for the rest of its `staleTime`.
+     *
+     * Swallows its own errors — a failed refresh just leaves the previous flags in
+     * place; nothing the user changed failed to save, so this never raises
+     * `saveMessage`, and the server's 403 backstop still protects every mutation in
+     * the meantime.
+     */
+    async function refreshOverCapFlags(): Promise<void> {
+        if (hydrateStatus.value === 'loading') {
+            pendingFlagRefresh = true;
+            return;
+        }
+        if (!hydrated.value) return;
+        const epoch = hydrateEpoch;
+        try {
+            for (let page = 1; page <= loadedPage.value; page++) {
+                const result = await api.listPage(page, PAGE_SIZE);
+                if (epoch !== hydrateEpoch) return;
+                queryClient.setQueryData(spacesQueryKey(page), result);
+                for (const summary of result.spaces) {
+                    const existing = getById(summary.id);
+                    if (existing) existing.overCap = summary.overCap;
+                }
+                total.value = result.total;
+            }
+        } catch (e) {
+            console.error('[spaces] over-cap refresh failed', e);
+        }
+    }
+
+    // Replays a refresh that arrived while a hydrate was in flight (B-25 review N1)
+    // once that hydrate settles — success or failure — since `refreshOverCapFlags`
+    // re-validates `hydrated`/`hydrateStatus` itself, so a replay after a no-op/failed
+    // hydrate is harmless.
+    watch(hydrateStatus, (status) => {
+        if (status === 'loading' || !pendingFlagRefresh) return;
+        pendingFlagRefresh = false;
+        void refreshOverCapFlags();
+    });
+
+    // FR-3: a downgrade can badge spaces that were fetched under Pro (all `overCap:
+    // false`) — the refetch above is what discovers the new badge set. An upgrade
+    // needs no watch trigger at all: `useLimits.readonlySpaceIds` keeps its `isInf`
+    // early-return, so stale `overCap: true` flags are structurally invisible on Pro.
+    //
+    // Watches `session.plan` for a plan change the SPA only learns about after the
+    // fact (a scheduled-cancel webhook flip delivered via a later `AuthResponse`) and
+    // `session.planChangeEpoch` for `setPlan`'s own round-trip settling (B-25 review
+    // M1) — the epoch, not the optimistic `plan` flip itself, because `setPlan` sets
+    // `user.value.plan` *before* `POST /api/account` resolves, so a plan-only watch
+    // fires the refetch while the change is still in flight and can race it to a
+    // stale answer. `planChangeEpoch` only bumps once every branch of `setPlan` (incl.
+    // reverts) has already applied its final plan value, so this refetch always runs
+    // against a settled plan. Both sources stay watched: `plan` alone still covers the
+    // webhook-flip case, where no epoch bump ever happens locally.
+    watch([() => session.plan, () => session.planChangeEpoch], () => {
+        void refreshOverCapFlags();
+    });
 
     /**
      * Fetch one space's full (photo-less) zone/item graph — no-op if already loaded or
@@ -837,6 +938,9 @@ export const useSpacesStore = defineStore('spaces', () => {
             zones,
             items,
             ...summarize(zones, items),
+            // A create is always cap-gated (checkAddSpace), so a brand-new space can
+            // never be born over-cap — never clone a stale flag from `...orig` (B-25).
+            overCap: false,
         };
 
         const idx = spaces.value.findIndex((s) => s.id === id);
@@ -1011,6 +1115,7 @@ export const useSpacesStore = defineStore('spaces', () => {
         getById,
         hydrate,
         loadMoreSpaces,
+        refreshOverCapFlags,
         loadSpaceContents,
         isContentsLoading,
         isContentsLoaded,

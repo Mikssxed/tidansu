@@ -35,22 +35,35 @@ export function useLimits() {
     const isPaywallOpen = computed(() => paywallReason.value !== null);
 
     /**
-     * Ids of spaces beyond the plan's space cap — the same cap as `checkAddSpace`,
-     * evaluated positionally instead of as a count. Empty on Pro (unbounded cap).
+     * Ids of spaces the plan's space cap makes read-only — badged from the server's
+     * own `IsOverCap` truth (B-25), not from array position or `Id` order.
      *
-     * ⚠️ Determinism (the crux of B-17): slices `spaces.spaces` **as-is** — the
-     * store's existing order, which mirrors the server's stable `GetSpaces`
-     * ordering (`OrderBy(s => s.Id)`). Never re-sort here and never key off
-     * creation time or local mutation order, or a different set of spaces would
-     * become "the read-only ones" on every render — worse than not flagging at all.
-     * A live `computed` over `session.caps` + `spaces.spaces` (both reactive) —
-     * downgrade, upgrade, space add and space delete all re-derive it immediately,
-     * with no snapshot and no separate "unlock" step.
+     * B-17 originally sliced `spaces.spaces` positionally, on the assumption that the
+     * store's array order mirrors the server's stable `OrderBy(s => s.Id)`. That
+     * assumption broke with B-23: `reconcileSpaceId` swaps a space's local id for the
+     * server-assigned one in place (no repositioning) and `duplicateSpace` splices a
+     * copy mid-array, so array position stopped tracking `Id` order — the SPA could
+     * badge a different set of spaces than the server actually rejects mutations for.
+     * The server now ships the authoritative determination per space
+     * (`SpaceSummaryDto.IsOverCap`, computed with the same
+     * `PlanPolicy.CheckSpaceContentMutation` predicate `SpaceOverCapGuard` enforces —
+     * see its class doc), and the SPA badges from that flag directly. Never derive
+     * over-cap from position, id sorting, or `localeCompare` again.
+     *
+     * Freshness (FR-3): the `isInf` early-return stays load-bearing — it is what makes
+     * an *upgrade* instant, since stale `overCap: true` flags become structurally
+     * invisible the moment `session.caps.spaces` flips to unbounded. A *downgrade* (or
+     * a delete pulling a sibling back under cap) is covered by
+     * `useSpacesStore.refreshOverCapFlags()`, triggered by a `session.plan` watch and
+     * by delete success — see that function's doc for the merge-only contract. A
+     * deep-linked space that was never in a loaded summaries page falls back to the
+     * server's 403 → `planReasonOf` → paywall path until the next list fetch. Still a
+     * plain `computed` over `session.caps` + `spaces.spaces` (both reactive) — no
+     * snapshot, no watcher here.
      */
     const readonlySpaceIds = computed<Set<string>>(() => {
-        const cap = session.caps.spaces;
-        if (isInf(cap)) return new Set();
-        return new Set(spaces.spaces.slice(cap).map((s) => s.id));
+        if (isInf(session.caps.spaces)) return new Set();
+        return new Set(spaces.spaces.filter((s) => s.overCap).map((s) => s.id));
     });
 
     /** Whether a space is read-only because it sits beyond the plan's space cap. */

@@ -75,4 +75,11 @@ export interface Space {
     zoneCount: number;
     /** First (up to) 6 zone colours, ordered by position — dashboard preview bands. */
     previewColors: ZoneColor[];
+    /**
+     * Server-authoritative "this space is one of the account's excess spaces and is
+     * read-only" truth (B-25) — carried by the summaries list and never derived
+     * client-side (position/id order). Optional: locally built spaces (onboarding,
+     * duplicate, the starter seed) legitimately omit it; absent means not over-cap.
+     */
+    overCap?: boolean;
 }

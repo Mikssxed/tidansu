@@ -27,6 +27,14 @@ namespace Tidansu.Application.Spaces;
 // call site stays identical regardless of what gates a handler already runs, which
 // is worth more than saving one indexed PK read. Revisit only if profiling ever
 // shows this lookup mattering.
+//
+// B-25: the GET /api/spaces list flag (SpaceSummaryDto.IsOverCap, computed in
+// GetSpacesQueryHandler) shares this class's predicate, PlanPolicy.
+// CheckSpaceContentMutation, feeding it the page query's own `skip + rowIndex`
+// as rank instead of a second CountSpacesOrderedBeforeAsync call (both rank
+// sources walk the same collated Id order — see that method's comment). Any
+// change to the over-cap rule must go through PlanPolicy.CheckSpaceContentMutation
+// so enforcement here and the advertised list flag cannot diverge.
 public class SpaceOverCapGuard(IUserService userService, ISpacesRepository spaces)
 {
     public async Task EnsureSpaceContentWritableAsync(string spaceId, string userId, CancellationToken cancellationToken = default)

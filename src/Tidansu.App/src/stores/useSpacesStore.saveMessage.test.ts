@@ -50,6 +50,13 @@ vi.mock('@/queryClient', () => ({
     spacesQueryKey: (page: number) => ['spaces', page],
     spaceContentsKey: (id: string) => ['space', id],
 }));
+// B-25: the store now composes `useSessionStore` (plan-watch trigger for
+// `refreshOverCapFlags`) — the real store reads `localStorage`, absent under this
+// file's node test environment. Fixed Pro plan/cap: this suite isn't exercising the
+// over-cap flag, so a never-firing watch + `isInf`-skipped delete refresh is correct.
+vi.mock('@/stores/useSessionStore', () => ({
+    useSessionStore: () => ({ plan: 'pro', caps: { spaces: Infinity } }),
+}));
 
 import { useSpacesStore } from './useSpacesStore';
 

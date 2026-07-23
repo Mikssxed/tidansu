@@ -921,6 +921,7 @@ export function deserializeIntoSpaceSummaryDto(spaceSummaryDto: Partial<SpaceSum
         "canvasMode": n => { spaceSummaryDto.canvasMode = n.getStringValue(); },
         "columnLabels": n => { spaceSummaryDto.columnLabels = n.getCollectionOfPrimitiveValues<string>("string"); },
         "id": n => { spaceSummaryDto.id = n.getStringValue(); },
+        "isOverCap": n => { spaceSummaryDto.isOverCap = n.getBooleanValue(); },
         "itemCount": n => { spaceSummaryDto.itemCount = n.getNumberValue(); },
         "layoutColumns": n => { spaceSummaryDto.layoutColumns = n.getNumberValue(); },
         "name": n => { spaceSummaryDto.name = n.getStringValue(); },
@@ -1643,6 +1644,7 @@ export function serializeSpaceSummaryDto(writer: SerializationWriter, spaceSumma
     writer.writeStringValue("canvasMode", spaceSummaryDto.canvasMode);
     writer.writeCollectionOfPrimitiveValues<string>("columnLabels", spaceSummaryDto.columnLabels);
     writer.writeStringValue("id", spaceSummaryDto.id);
+    writer.writeBooleanValue("isOverCap", spaceSummaryDto.isOverCap);
     writer.writeNumberValue("itemCount", spaceSummaryDto.itemCount);
     writer.writeNumberValue("layoutColumns", spaceSummaryDto.layoutColumns);
     writer.writeStringValue("name", spaceSummaryDto.name);
@@ -1864,6 +1866,10 @@ export interface SpaceSummaryDto extends Parsable {
      * The id property
      */
     id: string;
+    /**
+     * The isOverCap property
+     */
+    isOverCap: boolean;
     /**
      * The itemCount property
      */

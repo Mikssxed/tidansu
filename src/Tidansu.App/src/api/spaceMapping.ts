@@ -58,6 +58,7 @@ export function toSpaceSummary(dto: SpaceSummaryDto): Space {
         itemCount: dto.itemCount,
         zoneCount: dto.zoneCount,
         previewColors: (dto.previewColors ?? []) as ZoneColor[],
+        overCap: dto.isOverCap ?? false,
     };
 }
 
