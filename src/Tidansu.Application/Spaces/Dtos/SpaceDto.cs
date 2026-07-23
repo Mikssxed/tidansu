@@ -2,6 +2,11 @@ using Tidansu.Domain.Entities;
 
 namespace Tidansu.Application.Spaces.Dtos;
 
+// B-26: request-only shape as of this task — the create body (POST /api/spaces).
+// The response shape for the space root (GET /api/spaces/{id} AND the create
+// response) is SpaceReadDto; this class has no FromEntity. Never add a
+// server-computed field (e.g. an over-cap flag) here — a request DTO that also
+// carries server-derived state is exactly the B-16 shared-DTO wipe trap (FR-2).
 public class SpaceDto
 {
     public string Id { get; set; } = null!;
@@ -13,19 +18,6 @@ public class SpaceDto
     public List<string>? ColumnLabels { get; set; }
     public List<ZoneDto> Zones { get; set; } = [];
     public List<ItemDto> Items { get; set; } = [];
-
-    public static SpaceDto FromEntity(Space s) => new()
-    {
-        Id = s.Id,
-        Name = s.Name,
-        Type = s.Type,
-        ViewMode = s.ViewMode,
-        CanvasMode = s.CanvasMode,
-        LayoutColumns = s.LayoutColumns,
-        ColumnLabels = s.ColumnLabels is null ? null : [.. s.ColumnLabels],
-        Zones = [.. s.Zones.OrderBy(z => z.Position).Select(ZoneDto.FromEntity)],
-        Items = [.. s.Items.Select(ItemDto.FromEntity)],
-    };
 
     public Space ToEntity(string userId) => new()
     {

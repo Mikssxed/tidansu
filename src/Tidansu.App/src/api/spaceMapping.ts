@@ -1,4 +1,4 @@
-import type { ItemDto, SpaceDto, SpaceFieldsDto, SpaceSummaryDto, ZoneDto } from '@/api/apiClient/models';
+import type { ItemDto, SpaceDto, SpaceFieldsDto, SpaceReadDto, SpaceSummaryDto, ZoneDto } from '@/api/apiClient/models';
 import type { IconName } from '@/components/icons';
 import { summarize } from '@/data/spaces';
 import type {
@@ -19,8 +19,15 @@ import type {
  * Field names line up by design (item 1), so this mostly normalises nullability —
  * notably `rect`, which the generated `ZoneDto` types as non-null but the server
  * round-trips as null for columns-mode zones.
+ *
+ * `dto` is `SpaceReadDto` — the sole response shape for `GET /api/spaces/{id}` and
+ * `POST /api/spaces` as of B-26 — so `isOverCap` is the server's authoritative,
+ * point-in-time over-cap truth for this space (computed with the same
+ * `PlanPolicy.CheckSpaceContentMutation` predicate `SpaceOverCapGuard` enforces
+ * with; never derive it client-side). This supersedes B-25 T-6, which deliberately
+ * left the flag unmapped here because the endpoint didn't carry it yet.
  */
-export function toSpace(dto: SpaceDto): Space {
+export function toSpace(dto: SpaceReadDto): Space {
     const zones = (dto.zones ?? []).map(toZone);
     const items = (dto.items ?? []).map(toItem);
     return {
@@ -36,6 +43,7 @@ export function toSpace(dto: SpaceDto): Space {
         // The full-graph DTO carries no summary fields — derive them from the
         // graph that just arrived, same shape the server's summary projects.
         ...summarize(zones, items),
+        overCap: dto.isOverCap ?? false,
     };
 }
 

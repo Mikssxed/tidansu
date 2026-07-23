@@ -35,18 +35,33 @@ namespace Tidansu.Application.Spaces;
 // sources walk the same collated Id order — see that method's comment). Any
 // change to the over-cap rule must go through PlanPolicy.CheckSpaceContentMutation
 // so enforcement here and the advertised list flag cannot diverge.
+//
+// B-26: GetSpaceQueryHandler (the single-space GET) is a fourth consumer, via
+// IsSpaceOverCapAsync below — the same "owner-scope first" existence-oracle
+// caveat above applies to it too: it must call this only after its own 404 check.
+// EnsureSpaceContentWritableAsync and IsSpaceOverCapAsync share one private
+// reason path (user lookup → Pro short-circuit → rank → predicate) so there is
+// still exactly one implementation of "is this space over cap?".
 public class SpaceOverCapGuard(IUserService userService, ISpacesRepository spaces)
 {
     public async Task EnsureSpaceContentWritableAsync(string spaceId, string userId, CancellationToken cancellationToken = default)
+    {
+        if (await OverCapReasonAsync(spaceId, userId, cancellationToken) is { } reason)
+            throw new PlanLimitException(reason);
+    }
+
+    public async Task<bool> IsSpaceOverCapAsync(string spaceId, string userId, CancellationToken cancellationToken = default) =>
+        await OverCapReasonAsync(spaceId, userId, cancellationToken) is not null;
+
+    private async Task<string?> OverCapReasonAsync(string spaceId, string userId, CancellationToken cancellationToken)
     {
         var user = await userService.FindByIdAsync(userId, cancellationToken)
             ?? throw new AuthenticationException("user not found");
 
         // Pro short-circuit: caps.Spaces is null, so no rank query is ever run for Pro.
-        if (PlanCaps.For(user.Plan).Spaces is not int) return;
+        if (PlanCaps.For(user.Plan).Spaces is not int) return null;
 
         var preceding = await spaces.CountSpacesOrderedBeforeAsync(spaceId, userId, cancellationToken);
-        if (PlanPolicy.CheckSpaceContentMutation(user.Plan, preceding) is { } reason)
-            throw new PlanLimitException(reason);
+        return PlanPolicy.CheckSpaceContentMutation(user.Plan, preceding);
     }
 }

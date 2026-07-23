@@ -904,17 +904,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpaceDtoApiOperationResult"
+                  "$ref": "#/components/schemas/SpaceReadDtoApiOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpaceDtoApiOperationResult"
+                  "$ref": "#/components/schemas/SpaceReadDtoApiOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpaceDtoApiOperationResult"
+                  "$ref": "#/components/schemas/SpaceReadDtoApiOperationResult"
                 }
               }
             }
@@ -1023,17 +1023,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpaceDtoApiOperationResult"
+                  "$ref": "#/components/schemas/SpaceReadDtoApiOperationResult"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpaceDtoApiOperationResult"
+                  "$ref": "#/components/schemas/SpaceReadDtoApiOperationResult"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SpaceDtoApiOperationResult"
+                  "$ref": "#/components/schemas/SpaceReadDtoApiOperationResult"
                 }
               }
             }
@@ -2035,32 +2035,6 @@
           "zones"
         ]
       },
-      "SpaceDtoApiOperationResult": {
-        "type": "object",
-        "properties": {
-          "errors": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "isSuccess": {
-            "type": "boolean"
-          },
-          "data": {
-            "$ref": "#/components/schemas/SpaceDto"
-          }
-        },
-        "additionalProperties": false,
-        "required": [
-          "data",
-          "errors",
-          "isSuccess"
-        ]
-      },
       "SpaceFieldsDto": {
         "type": "object",
         "properties": {
@@ -2114,6 +2088,90 @@
           },
           "data": {
             "$ref": "#/components/schemas/SpaceFieldsDto"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "data",
+          "errors",
+          "isSuccess"
+        ]
+      },
+      "SpaceReadDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "viewMode": {
+            "type": "string"
+          },
+          "canvasMode": {
+            "type": "string"
+          },
+          "layoutColumns": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "columnLabels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "nullable": true
+          },
+          "zones": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ZoneDto"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemDto"
+            }
+          },
+          "isOverCap": {
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "canvasMode",
+          "id",
+          "isOverCap",
+          "items",
+          "layoutColumns",
+          "name",
+          "type",
+          "viewMode",
+          "zones"
+        ]
+      },
+      "SpaceReadDtoApiOperationResult": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "isSuccess": {
+            "type": "boolean"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SpaceReadDto"
           }
         },
         "additionalProperties": false,

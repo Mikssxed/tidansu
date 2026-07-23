@@ -808,7 +808,9 @@ export const useSpacesStore = defineStore('spaces', () => {
      * space beyond page 1), `getById` returns null — rather than treating that as
      * unknown, this fetches the space directly via `GET /{id}` and inserts the result
      * into `spaces.value`, so the caller (`SpaceView`'s watch) never has to redirect a
-     * space that genuinely exists.
+     * space that genuinely exists. B-26: that direct `GET /{id}` fetch now carries the
+     * server's own `IsOverCap` too (`toSpace`), so a deep-linked space is badged
+     * read-only on first paint without any list fetch ever having run.
      *
      * Returns 'not-found' only on a confirmed 404 (safe to redirect away from);
      * any other failure returns 'error' and leaves `isContentsFailed(id)` true so the
@@ -828,6 +830,11 @@ export const useSpacesStore = defineStore('spaces', () => {
             if (existing) {
                 existing.zones = full.zones;
                 existing.items = full.items;
+                // B-26: `GET /{id}` now carries the server's own over-cap truth — merge it
+                // onto the existing object (never replace) per the same merge-only contract
+                // `refreshOverCapFlags` follows, so this fresher point-in-time read can only
+                // correct the badge, not disturb any in-flight `ChangeSet`'s object identity.
+                existing.overCap = full.overCap;
                 refreshSummary(existing);
             } else {
                 spaces.value.push(full);

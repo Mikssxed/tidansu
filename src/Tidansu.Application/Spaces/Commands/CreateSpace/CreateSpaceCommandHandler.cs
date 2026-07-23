@@ -15,7 +15,7 @@ public class CreateSpaceCommandHandler(
     ISpacesRepository spaces,
     IUserService userService,
     IUserContext userContext,
-    ISpaceIdGenerator spaceIdGenerator) : IRequestHandler<CreateSpaceCommand, SpaceDto>
+    ISpaceIdGenerator spaceIdGenerator) : IRequestHandler<CreateSpaceCommand, SpaceReadDto>
 {
     // Defense-in-depth only (B-23 S-4): a 128-bit CSPRNG collision is astronomically
     // rarer than a hardware fault, and even a residual DbUpdateException is mapped to a
@@ -23,7 +23,7 @@ public class CreateSpaceCommandHandler(
     // was never client-chosen). This just avoids burning that 500 on a vanishing chance.
     private const int MaxIdCollisionRetries = 3;
 
-    public async Task<SpaceDto> Handle(CreateSpaceCommand request, CancellationToken cancellationToken)
+    public async Task<SpaceReadDto> Handle(CreateSpaceCommand request, CancellationToken cancellationToken)
     {
         var userId = userContext.GetCurrentUser().Id;
         var user = await userService.FindByIdAsync(userId, cancellationToken)
@@ -77,7 +77,13 @@ public class CreateSpaceCommandHandler(
                     await spaces.AddAsync(entity, cancellationToken);
                 }
 
-                return SpaceDto.FromEntity(entity);
+                // B-26: false is deterministic here, not a placeholder — a successful
+                // create implies count <= cap on every plan path (CheckNewSpace above
+                // rejects an already-over-cap Free account; AddWithinSpaceCapAsync
+                // re-counts atomically in-lock; Pro is unbounded), so no space,
+                // including this one, can be over cap right after a successful
+                // create. No rank query needed.
+                return SpaceReadDto.FromEntity(entity, isOverCap: false);
             }
             catch (DbUpdateException) when (attempt < MaxIdCollisionRetries)
             {

@@ -55,11 +55,12 @@ export function useLimits() {
      * invisible the moment `session.caps.spaces` flips to unbounded. A *downgrade* (or
      * a delete pulling a sibling back under cap) is covered by
      * `useSpacesStore.refreshOverCapFlags()`, triggered by a `session.plan` watch and
-     * by delete success — see that function's doc for the merge-only contract. A
-     * deep-linked space that was never in a loaded summaries page falls back to the
-     * server's 403 → `planReasonOf` → paywall path until the next list fetch. Still a
-     * plain `computed` over `session.caps` + `spaces.spaces` (both reactive) — no
-     * snapshot, no watcher here.
+     * by delete success — see that function's doc for the merge-only contract. The
+     * single-space read (`GET /{id}`, via `loadSpaceContents`) carries the same
+     * server-computed flag as of B-26, so a deep-linked space is badged on load
+     * instead of falling back to the server's 403 → `planReasonOf` → paywall path.
+     * Still a plain `computed` over `session.caps` + `spaces.spaces` (both reactive) —
+     * no snapshot, no watcher here.
      */
     const readonlySpaceIds = computed<Set<string>>(() => {
         if (isInf(session.caps.spaces)) return new Set();
