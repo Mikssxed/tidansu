@@ -27,12 +27,17 @@ correct client on a clean clone, with no manual steps and no version-pinning
 tribal knowledge.
 
 ## Acceptance criteria
-- [ ] A clean clone runs `npm run build:api` and produces a correct Kiota client
+- [x] A clean clone runs `npm run build:api` and produces a correct Kiota client
       with **no manual steps** (no running-app fetch, no hand-run swagger steps).
-- [ ] Re-running the command against an unchanged backend produces an **empty
-      diff** against the committed client.
-- [ ] `CLAUDE.md`'s documented command matches what actually works.
-- [ ] No regression to `npm run build` (type-check + build) or `dotnet build`.
+      Script self-runs `dotnet tool restore` (pinned kiota) and forces an empty
+      connection string so no DB is needed.
+- [x] Re-running the command against an unchanged backend produces an **empty
+      diff** against the committed client. Verified: two back-to-back runs → empty
+      `git diff src/api/` both times.
+- [x] `CLAUDE.md`'s documented command matches what actually works (updated to the
+      one-command build-time-OpenAPI flow).
+- [x] No regression to `npm run build` (type-check + build) or `dotnet build`
+      (both green; generation off by default so plain `dotnet build` is unaffected).
 
 ## Notes
 **Root cause is diagnosed, not guessed** (per backlog): this is *not* the

@@ -61,7 +61,7 @@ This keeps `Development` (so the `AddPresentation` fail-loud secret guards stay 
 
 ## Action Checklist
 - [x] [M1] Add `ConnectionStrings__TidansuDb=` to the `build:api-file` env so generation skips the migration block (or document LocalDB as a prerequisite in `CLAUDE.md`).
-- [ ] [N1] Drop `IncludeAssets` from the `ApiDescription.Server` ref (or verify publish output is clean).
+- [~] [N1] Drop `IncludeAssets` from the `ApiDescription.Server` ref — **declined** (won't-do): harmless redundancy on a build-only `PrivateAssets="all"` ref; publish output already verified to carry no `ApiDescription` assembly.
 - [x] [N2] Add an `existsSync(sourceDir)` guard in `copy-openapi.mjs`.
 - [x] [N3] Optionally prepend `dotnet tool restore` to the `build:api` chain.
 

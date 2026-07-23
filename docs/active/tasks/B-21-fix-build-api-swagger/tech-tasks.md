@@ -194,30 +194,38 @@ host resolution is proven).
 
 ## 2. 🔒 Security Considerations
 
-- **getdocument builds the service provider (runs registration code).** 🟢 Low.
-  It executes DI registration (up to `builder.Build()`) but **not** middleware,
-  `app.Run()`, or the DB migration block. No inbound socket is opened, no SQL
-  connection is made, no secret is required (Development keeps the fail-loud guards
-  inert).
-  - [ ] Confirm generation runs as `Development` so no real JWT/SMTP/Stripe secret is
-    ever needed or read during a client regen (`cross-env` already sets this).
+- **getdocument runs the app's startup body.** 🟢 Low. **Correction (verified in
+  build):** getdocument does *not* stop at `builder.Build()` — it runs the full
+  top-level `Program.cs` up to `app.Run()`, including the DB migration block. This
+  is defused by forcing `ConnectionStrings__TidansuDb=` empty (the `Program.cs:19-20`
+  guard then skips migration) so **no SQL connection is made**. No inbound socket is
+  opened; Development keeps the fail-loud secret guards inert, so no real
+  JWT/SMTP/Stripe secret is required.
+  - [x] Confirm generation runs as `Development` so no real JWT/SMTP/Stripe secret is
+    ever needed or read during a client regen (`cross-env` sets this). **Verified:**
+    run-2 build log shows no migration/SQL/LocalDB lines; regen succeeds with the
+    connection string empty.
 - **No new runtime attack surface.** 🟢 Low. `Microsoft.Extensions.ApiDescription.Server`
   is `PrivateAssets="all"` (build-only) and ships nothing to the deployed app.
-  - [ ] Verify the package does not appear in the published output / `bin` runtime
-    closure after a `dotnet publish`.
+  - [x] Verify the package does not appear in the published output / `bin` runtime
+    closure after a `dotnet publish`. **Verified:** `dotnet publish -c Release` output
+    carries no `ApiDescription`-named assembly.
 
 ## 3. 📈 Scalability / Correctness Considerations
 
 - **Idempotence is the true bar (FR-2), not "it runs".** A non-deterministic doc
   would leave every future backend PR with unreviewable client churn.
-  - [ ] The two verification runs above must both yield an empty diff. Swashbuckle's
+  - [x] The two verification runs above must both yield an empty diff. Swashbuckle's
     generator is deterministic for a fixed contract; if ordering flutter appears,
     normalize in `fix-openapi.mjs` (it already re-serializes) rather than accepting
-    churn.
+    churn. **Verified:** two back-to-back `npm run build:api` runs → empty
+    `git diff src/api/` both times; no ordering flutter, no normalization needed.
 - **Normal-build cost (FR-5).** `OpenApiGenerateDocumentsOnBuild=false` means the
   generation target is inert on ordinary `dotnet build` / `npm run build`.
-  - [ ] Confirm no measurable build-time change on a plain `dotnet build` after adding
-    the package + properties.
+  - [x] Confirm no measurable build-time change on a plain `dotnet build` after adding
+    the package + properties. **Verified:** plain `dotnet build` emits no OpenAPI doc
+    (`obj/openapi/api.json` mtime unchanged) and no new warnings — the generation
+    target is inert without the `-p:` flag.
 - **Contract drift going forward (out of scope, noted).** Nothing here fails a PR
   when a dev forgets to regen after a controller change — that is the deferred CI
   drift-check (already backlogged as the B-21 follow-up; see Open Question 3).
