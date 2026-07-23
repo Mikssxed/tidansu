@@ -400,6 +400,40 @@ over-cap selection), possibly `src/Tidansu.App/src/stores/useSpacesStore.ts`
 `docs/active/tasks/B-23-scoped-space-keys/security-review.md` § S-L1 and
 `docs/active/tasks/B-24-server-overcap-readonly/review.md`.
 
+### [B-26] Carry the over-cap flag on `GET /api/spaces/{id}` (needs a read-DTO split)
+**Priority**: P3
+**Status**: unprocessed
+Deferred from B-25. The list endpoint now returns the server's authoritative
+`IsOverCap` per space (`SpaceSummaryDto`), but the single-space endpoint doesn't —
+so a deep link into a space that was never loaded via the list has no badge truth
+until the list is fetched. The blocker is that `SpaceDto` doubles as the
+create/update **request body** (the B-16 shared-DTO wipe trap), so adding a
+server-computed field to it is unsafe; this needs a read-DTO split first (separate
+response DTO for `GET /api/spaces/{id}`), then the same
+`PlanPolicy.CheckSpaceContentMutation` predicate the list and `SpaceOverCapGuard`
+share. Consider `design-an-interface` for the DTO split. Low urgency: server
+enforcement already 403s correctly; only the badge can lag on the deep-link path.
+_Touch points:_ `src/Tidansu.Application/Spaces/Dtos/SpaceDto.cs` (split),
+`GetSpaceQueryHandler`, Kiota regen, `src/Tidansu.App/src/api/spaceMapping.ts`
+(`toSpace` deliberately doesn't map the flag today — revisit).
+See `docs/active/tasks/B-25-overcap-badge-parity/tech-tasks.md` (deferred Q1).
+
+### [B-27] Sync feature must refresh over-cap flags on its own trigger
+**Priority**: P3
+**Status**: unprocessed
+Deferred from B-25 — a design note for whenever Pro sync ships, not actionable
+before then. B-25's over-cap badge refreshes on plan-change settlement and on
+delete; a future sync channel (another device adding/deleting spaces, or a plan
+change landing via webhook while the app is open) introduces new paths that change
+the server's over-cap set without firing either trigger, leaving stale badges
+until reload. When building sync, wire its "spaces changed remotely" signal to
+`useSpacesStore.refreshOverCapFlags()` (merge-only, already epoch-guarded), and
+verify the transient windows stay directionally safe (the 403→paywall backstop
+covers under-badging).
+_Touch points:_ future sync store/composable;
+`src/Tidansu.App/src/stores/useSpacesStore.ts` (`refreshOverCapFlags`).
+See `docs/active/tasks/B-25-overcap-badge-parity/tech-tasks.md` (deferred Q2).
+
 ### [B-23] `Space.Id` is globally unique + client-supplied → the same cross-tenant DoS, one level up
 **Priority**: P1
 **Status**: ✅ done (2026-07-23 — server-assigned CSPRNG `Space.Id` + per-account rate limit + store/route reconcile; both-reviewer'd clean, FR-6 verified via live browser drive; see `docs/active/tasks/B-23-scoped-space-keys/`. Residual parity item filed as B-25.)
