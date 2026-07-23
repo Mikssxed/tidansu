@@ -15,5 +15,5 @@
 - [Space-scoped Zone/Item keys](arch_space-scoped-zone-item-keys.md) — no Item→Zone FK exists (don't add one); key widening can't fail on existing data; bare-id lookups stop being accidentally safe (B-22)
 - [Frontend downgrade read-only seam](frontend_downgrade-readonly-seam.md) — over-cap read-only is a UI-only gate: computed in useLimits (slice store.spaces by cap, stable Id order), gated at the view layer not the store; server enforcement is a separate follow-up (B-17)
 - [Root-entity id can't be composite-keyed](arch_root-entity-id-cannot-be-composite-keyed.md) — Space is the FK principal so B-22's (SpaceId,Id) doesn't transfer; server-assign the id (CSPRNG), no migration. Traps: FR-6 optimistic-add reconcile + UseRateLimiter-before-auth (B-23)
-- [Server over-cap read-only gate](arch_server-overcap-readonly-gate.md) — B-24: whole-space over-cap gate is a DISTINCT boundary from per-space count caps; shared SpaceOverCapGuard; rank/badge order is DB-collation, unreplicable client-side → B-25 ships server-sent IsOverCap (same PlanPolicy predicate)
+- [Server over-cap read-only gate](arch_server-overcap-readonly-gate.md) — B-24 whole-space gate ≠ count caps; B-25 server-sent IsOverCap; B-26 SpaceReadDto split + guard deepened to IsSpaceOverCapAsync (one oracle, four consumers)
 </content>

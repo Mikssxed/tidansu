@@ -67,6 +67,11 @@ Read `AddZoneCommandHandler.cs` — it is the reference implementation. The orde
   left before auth (as it was until B-23), the policy silently collapses to its IP
   fallback. The existing IP-keyed policies (auth/magic-link/webhook) are unaffected
   by this ordering either way — they key on `RemoteIpAddress`/a constant, not `User`.
+- **The space root's read/write shapes are split (B-26): `SpaceReadDto` is the sole
+  response shape for the space root** (`GET /api/spaces/{id}` and `POST /api/spaces`),
+  carrying server-computed fields like `IsOverCap`; `SpaceDto` is the create **request**
+  body only (`FromEntity` deleted from it). Never add a server-computed field to a
+  request shape (B-16 wipe trap) — give the response its own DTO instead.
 
 ---
 

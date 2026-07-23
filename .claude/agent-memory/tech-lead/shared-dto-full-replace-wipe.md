@@ -24,3 +24,10 @@ Trade-off: the field can then no longer be *cleared* via update (null == unchang
 acceptable when no UI clears it; hand the clear-affordance to the owning slice.
 Read-path projection itself (no column leaving SQL) is proven via the EF SQL log,
 per [[read-path-projection-fixes]].
+
+**Scope limit (B-26):** this rule bites only when the shared DTO round-trips into a
+*full-replace update* handler. Where the write surface is create-only (space root:
+no whole-graph PUT exists — SpaceFieldsDto + granular zone/item endpoints replaced
+it), a clean read/write DTO split IS the right fix and gives server-computed fields
+(e.g. `SpaceReadDto.IsOverCap`) a safe home. Check what actually consumes the write
+shape before rejecting a split.

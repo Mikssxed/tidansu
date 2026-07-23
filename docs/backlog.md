@@ -402,7 +402,7 @@ over-cap selection), possibly `src/Tidansu.App/src/stores/useSpacesStore.ts`
 
 ### [B-26] Carry the over-cap flag on `GET /api/spaces/{id}` (needs a read-DTO split)
 **Priority**: P3
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-23 — flat `SpaceReadDto` is now the sole space-root response shape (`GET /{id}` + create, create's flag deterministically `false`); `SpaceDto` slimmed to request-only; `SpaceOverCapGuard` deepened into the single over-cap oracle (`IsSpaceOverCapAsync` sharing one private path with enforcement — one rule, four consumers). SPA maps the flag in `toSpace` + merge-only deep-link merge. Review: approve, 0 🔴/🟠; forgery probe + cold-cache deep-link drive verified. See `docs/active/tasks/B-26-space-read-dto-overcap/`.)
 Deferred from B-25. The list endpoint now returns the server's authoritative
 `IsOverCap` per space (`SpaceSummaryDto`), but the single-space endpoint doesn't —
 so a deep link into a space that was never loaded via the list has no badge truth

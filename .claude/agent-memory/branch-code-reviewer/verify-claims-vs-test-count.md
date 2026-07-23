@@ -26,4 +26,10 @@ against its own defining literal (a change-detector, marginal but not worthless)
 - Don't let this become a reflex to distrust green suites. B-13's suite was genuinely good
   (real magic-byte fixtures, cap pinned on both sides); the padding was the exception.
 
-Related: [[fluentvalidation-must-nre-on-json-null]]
+- **Mapper-seam variant (B-26):** SPA store suites mock `useSpacesApi` wholesale, so the
+  DTO→`Space` mappers in `spaceMapping.ts` are executed by *no* test — and optional `Space`
+  fields (`overCap?`) mean vue-tsc won't catch a dropped mapping line either. When a task's
+  load-bearing SPA change is one line in a mapper, ask specifically whether any gate reddens
+  if that line is deleted; if not, recommend a pure-function `spaceMapping` test (no mocks).
+
+Related: [[fluentvalidation-must-nre-on-json-null]], [[empty-fixtures-hide-rollback-bugs]]

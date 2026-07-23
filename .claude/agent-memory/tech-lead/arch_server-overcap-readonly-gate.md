@@ -54,7 +54,20 @@ CountSpacesOrderedBeforeAsync N+1). SPA: `Space.overCap?`, `useLimits` filters o
 Pro); freshness = `useSpacesStore.refreshOverCapFlags()`, a **merge-only** summaries
 refetch (never replace Space objects — the M2 pending-ChangeSet hazard that bans
 `hydrate(true)`), triggered by a `session.plan` watch + delete-success under finite
-cap. Open follow-ups: `GET /spaces/{id}` deep-link edge (SpaceDto doubles as write
-body — don't bolt the flag on), and future sync needs its own refresh trigger.
+cap. Open follow-ups: future sync needs its own refresh trigger (B-25 Q2, deferred).
+
+**B-26 (deep-link parity — planned):** the `GET /spaces/{id}` edge closes via a
+read-DTO split: new flat `SpaceReadDto` is the sole space-root *response* shape
+(GET /{id} AND POST create); `SpaceDto` keeps its name, becomes request-only.
+Key discovery: `SpaceDto`'s write surface is create-only (no whole-graph PUT
+exists anymore — SpaceFieldsDto + granular zone/item endpoints), so the
+[[shared-dto-full-replace-wipe]] caveat doesn't apply and a clean split is safe.
+Rank for a single read: `SpaceOverCapGuard` deepened with `IsSpaceOverCapAsync`
+(shares one private reason path with Ensure — Pro short-circuit + rank query +
+predicate stay ONE implementation; guard is now the oracle for four consumers).
+Create's response flag is deterministically false (success ⇒ count <= cap on
+every plan path) — no rank query on create. SPA: `toSpace` maps `overCap`;
+`loadSpaceContents` merges it field-wise onto the existing object (merge-only
+contract), cold-cache push carries it free.
 </content>
 </invoke>
