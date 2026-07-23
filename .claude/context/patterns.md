@@ -110,6 +110,24 @@ Read `AddZoneCommandHandler.cs` — it is the reference implementation. The orde
   `src/stores/useSpacesStore.flush.test.ts` — mocks the api/queryClient modules and
   drives the Pinia store. Use it only for data-integrity cases with timing a manual
   browser drive can't hit; otherwise `npm run build` + a manual drive is the gate.
+- **Never derive server ordering client-side.** Server "Id order" is DB-collation
+  order (`SQL_Latin1_General_CP1_CI_AS` — CI, word-sort), which JS ordinal /
+  `localeCompare` / array position cannot replicate. Order-dependent truth (e.g.
+  the over-cap read-only set) is **server-sent** — `SpaceSummaryDto.IsOverCap`
+  (B-25), computed from the same `PlanPolicy` predicate the enforcement guard uses.
+- **Server-refresh triggers must key on *settlement*, not an optimistic flip.**
+  `useSessionStore.setPlan` (and `setSync`) mutate state *before* the server call
+  resolves — a `watch` on that state fires while the POST is still in flight, so a
+  refetch it triggers races the commit and can be served pre-change data with no
+  later trigger to correct it (B-25 M1). Fire such refetches from the mutation's
+  `.then`/`.catch` (or an epoch ref bumped there), keeping the plain watch only for
+  flips that arrive already-committed (e.g. via `AuthResponse`).
+- **When a Pinia store composes another store in its `setup()`** (e.g.
+  `useSpacesStore` calling `useSessionStore()` for a cross-store `watch`, B-25),
+  every existing `*.test.ts` for the composing store needs a `vi.mock('@/stores/
+  <composed>Store', ...)` added too, not just new tests — vitest runs in a plain
+  node environment (no `jsdom`), so an un-mocked `useSessionStore` throws on its
+  `localStorage.getItem` at store-setup time and breaks every prior test file.
 
 ---
 

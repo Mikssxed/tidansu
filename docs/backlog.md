@@ -379,7 +379,7 @@ _Touch points:_ `src/Tidansu.App/src/stores/useSpacesStore.ts`,
 
 ### [B-25] SPA over-cap badging can disagree with the server's read-only set
 **Priority**: P2
-**Status**: unprocessed
+**Status**: ✅ done (2026-07-23 — server-sent truth: advisory `IsOverCap` on `SpaceSummaryDto` computed via the same `PlanPolicy.CheckSpaceContentMutation` predicate `SpaceOverCapGuard` enforces with; SPA badges from the flag (merge-only `refreshOverCapFlags` + settlement-keyed plan/delete triggers) instead of slice-by-position. Reviewed, M1 race + 3 minors fixed; badged set ≡ 403 set verified by live drive. See `docs/active/tasks/B-25-overcap-badge-parity/`.)
 Follow-up carved out of B-23/B-24 review (Low, cross-feature). The SPA marks which
 spaces are over-cap (read-only after downgrade) by **array position** —
 `spaces.slice(caps.spaces)` in `src/Tidansu.App/src/composables/useLimits.ts` — but

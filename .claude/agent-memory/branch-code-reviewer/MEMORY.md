@@ -20,4 +20,5 @@
 - [Loading state untested in store suites](loading-state-untested-in-store-suites.md) — store suites assert only settled state; deleting the `status='loading'` line usually reddens nothing
 - [Recurring frontend review findings](review_recurring-frontend-findings.md) — split class/`:class` defeating twMerge, the `lock` icon as reserved paywall vocabulary, latch tests that assert an idempotent constant
 - [Store id reconcile vs route race](store-id-reconcile-route-race.md) — reconciling optimistic temp id→server id mutates space.id before router.replace lands, so SpaceView's vanish-watch bounces to dashboard
+- [Optimistic flip vs session watch race](optimistic-flip-watch-race.md) — session.plan flips before the POST commits; watches firing refetches race the server (B-25 M1)
 - [Tidansu pipeline review context](review_tidansu-pipeline-context.md) — backlog.md is stale, task.md is authoritative; work may be uncommitted on main; store invariants that must not be "fixed"
