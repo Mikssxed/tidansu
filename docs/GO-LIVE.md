@@ -5,6 +5,13 @@ internet. Written to be followed top‑to‑bottom with **no prior DevOps
 knowledge**. Every scary decision is called out with a plain‑English "what this
 means" and a recommended default.
 
+> 📋 **Interactive checklist:** this runbook is also a tick-off-as-you-go page
+> with saved progress —
+> <https://claude.ai/code/artifact/e26fa476-8d6e-4d77-b5f6-844483f01317>.
+> Your ticks are stored in your own browser (private, per-device); this file
+> stays the version-controlled source of truth. Keep the two in sync when steps
+> change.
+
 > **The one thing to understand first.** Tidansu goes live in **two milestones**,
 > not one:
 >
