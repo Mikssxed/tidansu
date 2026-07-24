@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,12 @@ using Tidansu.Extensions;
 using Tidansu.Infrastructure.Extensions;
 using Tidansu.Infrastructure.Persistence;
 using Tidansu.Middlewares;
+
+// B-20: pin invariant culture so FluentValidation's built-in messages don't localize to
+// the host OS locale — English-only UI, deliberate default; NOT `InvariantGlobalization`,
+// which would also swap ICU string comparison/casing to ordinal (see tech-tasks note).
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -1,0 +1,10 @@
+# Let Git normalize text files to LF in the repository, native on checkout.
+* text=auto
+
+# The generated Kiota API client and OpenAPI doc are regenerated on a Linux CI
+# runner and diffed byte-for-byte (see .github/workflows/ci.yml, kiota-drift job).
+# Pin them to LF in the repo so a Windows commit made with core.autocrlf=false
+# can't introduce CRLF and cause a false-positive "client drift" failure.
+# Keep these paths in sync with the PATHS list in the kiota-drift job.
+src/Tidansu.App/src/api/apiClient/** text eol=lf
+src/Tidansu.App/src/api/api.json     text eol=lf

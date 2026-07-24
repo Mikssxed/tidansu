@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (dotnet + spa)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/Tidansu.App/package-lock.json
+      - name: dotnet build (solution)
+        run: dotnet build Tidansu.sln -c Release
+      - name: npm ci
+        working-directory: src/Tidansu.App
+        run: npm ci
+      - name: npm run build (vue-tsc + vite)
+        working-directory: src/Tidansu.App
+        run: npm run build
+
+  kiota-drift:
+    name: kiota drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: src/Tidansu.App/package-lock.json
+      - name: dotnet tool restore (pinned kiota)
+        run: dotnet tool restore
+      - name: npm ci
+        working-directory: src/Tidansu.App
+        run: npm ci
+      - name: regenerate Kiota client (B-21 one-command flow)
+        working-directory: src/Tidansu.App
+        run: npm run build:api
+      - name: fail on client drift
+        run: |
+          # PATHS must track exactly what `npm run build:api` writes. If the Kiota
+          # output location changes (see src/Tidansu.App/package.json build:api*),
+          # update this list AND the eol=lf pins in the repo-root .gitattributes.
+          PATHS="src/Tidansu.App/src/api/apiClient src/Tidansu.App/src/api/api.json"
+          git add -A -- $PATHS
+          if ! git diff --cached --quiet -- $PATHS; then
+            echo "::error::The committed Kiota API client is out of date. A backend contract change landed without regenerating the client. Fix: run 'npm run build:api' from src/Tidansu.App and commit the result (see the build:api note in CLAUDE.md)."
+            echo "----- drift (git diff --cached --stat) -----"
+            git diff --cached --stat -- $PATHS
+            exit 1
+          fi
+          echo "Kiota client is up to date."

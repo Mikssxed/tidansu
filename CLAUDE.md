@@ -30,6 +30,9 @@ npm run build:api   # regenerate Kiota client from backend swagger (backend phas
   running host, no DB migration curl, no manual steps. The only prerequisite is
   `dotnet tool restore` (repo root) once per clone, which pins the exact `kiota` CLI
   version via `.config/dotnet-tools.json` — no global tool install needed.
+  CI (`.github/workflows/ci.yml`, `kiota-drift` job) enforces client freshness on
+  every PR by re-running this command and diffing the result — a red check means
+  run `npm run build:api` and commit the regenerated client.
 
 ### Backend (run from `src/Tidansu.API`)
 ```bash
