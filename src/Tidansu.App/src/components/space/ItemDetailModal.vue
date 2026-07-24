@@ -93,8 +93,9 @@
                 </div>
             </dl>
 
-            <!-- photo slot (Pro-gated) -->
+            <!-- photo slot (Pro-gated) — hidden until the photos feature ships (set :show-photo) -->
             <button
+                v-if="showPhoto"
                 type="button"
                 class="mt-5 flex w-full items-center justify-center gap-2 rounded-ctrl border border-dashed border-border-strong py-6 text-text-2 transition-colors hover:text-text"
                 @click="onPhotoClick"
@@ -130,11 +131,13 @@
         zone: Zone | null;
         type: SpaceTypeId;
         canPhoto: boolean;
+        /** Off until the photos feature ships — hides the "Add a photo" slot entirely. */
+        showPhoto?: boolean;
         /** B-17: false on a read-only (over-cap) space — hides Edit/Remove, viewing stays. */
         canEdit?: boolean;
     }
 
-    const props = withDefaults(defineProps<Props>(), { canEdit: true });
+    const props = withDefaults(defineProps<Props>(), { canEdit: true, showPhoto: false });
     const emit = defineEmits<{
         close: [];
         edit: [id: string];
