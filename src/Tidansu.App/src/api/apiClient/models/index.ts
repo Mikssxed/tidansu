@@ -789,6 +789,7 @@ export function deserializeIntoRefreshTokenCommand(refreshTokenCommand: Partial<
 // @ts-ignore
 export function deserializeIntoRequestMagicLinkCommand(requestMagicLinkCommand: Partial<RequestMagicLinkCommand> | undefined = {}) : Record<string, (node: ParseNode) => void> {
     return {
+        "acceptedTermsVersion": n => { requestMagicLinkCommand.acceptedTermsVersion = n.getStringValue(); },
         "email": n => { requestMagicLinkCommand.email = n.getStringValue(); },
         "returnUrl": n => { requestMagicLinkCommand.returnUrl = n.getStringValue(); },
     }
@@ -1212,6 +1213,10 @@ export interface RefreshTokenCommand extends Parsable {
 }
 export interface RequestMagicLinkCommand extends Parsable {
     /**
+     * The acceptedTermsVersion property
+     */
+    acceptedTermsVersion?: string | null;
+    /**
      * The email property
      */
     email?: string | null;
@@ -1529,6 +1534,7 @@ export function serializeRefreshTokenCommand(writer: SerializationWriter, refres
 // @ts-ignore
 export function serializeRequestMagicLinkCommand(writer: SerializationWriter, requestMagicLinkCommand: Partial<RequestMagicLinkCommand> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
     if (!requestMagicLinkCommand || isSerializingDerivedType) { return; }
+    writer.writeStringValue("acceptedTermsVersion", requestMagicLinkCommand.acceptedTermsVersion);
     writer.writeStringValue("email", requestMagicLinkCommand.email);
     writer.writeStringValue("returnUrl", requestMagicLinkCommand.returnUrl);
 }

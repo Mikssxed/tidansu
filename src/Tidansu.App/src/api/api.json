@@ -1919,6 +1919,7 @@
       },
       "RequestMagicLinkCommand": {
         "required": [
+          "acceptedTermsVersion",
           "email"
         ],
         "type": "object",
@@ -1929,6 +1930,9 @@
           "returnUrl": {
             "type": "string",
             "nullable": true
+          },
+          "acceptedTermsVersion": {
+            "type": "string"
           }
         },
         "additionalProperties": false

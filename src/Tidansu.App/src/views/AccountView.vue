@@ -213,6 +213,23 @@
             />
             Sign out
         </BaseButton>
+
+        <!-- Legal -->
+        <div class="mt-6 flex items-center justify-center gap-4 text-[13px] text-text-3">
+            <RouterLink
+                :to="{ name: 'legalTerms' }"
+                class="transition-colors hover:text-text"
+            >
+                Terms of Service
+            </RouterLink>
+            <span class="text-text-3">·</span>
+            <RouterLink
+                :to="{ name: 'legalPrivacy' }"
+                class="transition-colors hover:text-text"
+            >
+                Privacy Policy
+            </RouterLink>
+        </div>
     </div>
 </template>
 

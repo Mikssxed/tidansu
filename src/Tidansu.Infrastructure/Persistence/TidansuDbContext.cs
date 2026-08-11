@@ -8,6 +8,7 @@ public class TidansuDbContext(DbContextOptions<TidansuDbContext> options) : Iden
 {
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<MagicLinkToken> MagicLinkTokens { get; set; }
+    public DbSet<TermsAcceptance> TermsAcceptances { get; set; }
     public DbSet<Space> Spaces { get; set; }
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents { get; set; }
 
@@ -30,8 +31,23 @@ public class TidansuDbContext(DbContextOptions<TidansuDbContext> options) : Iden
         {
             token.Property(t => t.Email).HasMaxLength(256);
             token.Property(t => t.TokenHash).HasMaxLength(64);
+            token.Property(t => t.AcceptedTermsVersion).HasMaxLength(32);
             token.HasIndex(t => t.TokenHash).IsUnique();
             token.HasIndex(t => t.Email);
+        });
+
+        modelBuilder.Entity<TermsAcceptance>(acceptance =>
+        {
+            acceptance.Property(a => a.TermsVersion).HasMaxLength(32);
+
+            acceptance.HasOne(a => a.User)
+                .WithMany()
+                .HasForeignKey(a => a.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Backs ExistsAsync's dedupe check and enforces it at the DB in case two
+            // consumes race (unique-constraint catch beats a check-then-insert TOCTOU).
+            acceptance.HasIndex(a => new { a.UserId, a.TermsVersion }).IsUnique();
         });
 
         modelBuilder.Entity<User>(user =>

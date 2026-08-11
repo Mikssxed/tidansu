@@ -14,7 +14,8 @@ public class ConsumeMagicLinkCommandHandler(
     IJwtService jwtService,
     IUserService userService,
     IMagicLinkTokensRepository magicLinkTokens,
-    IRefreshTokensRepository refreshTokens) : IRequestHandler<ConsumeMagicLinkCommand, AuthResponse>
+    IRefreshTokensRepository refreshTokens,
+    ITermsAcceptancesRepository termsAcceptances) : IRequestHandler<ConsumeMagicLinkCommand, AuthResponse>
 {
     public async Task<AuthResponse> Handle(ConsumeMagicLinkCommand request, CancellationToken cancellationToken)
     {
@@ -45,7 +46,42 @@ public class ConsumeMagicLinkCommandHandler(
             ExpiresAt = jwtService.GetRefreshTokenExpiry(),
         }, cancellationToken);
 
+        await RecordTermsAcceptanceAsync(token, user.Id, cancellationToken);
+
         return AuthResponse.From(user, accessToken, refreshToken, expiresIn);
+    }
+
+    // Best-effort consent audit. Runs AFTER the sign-in tokens are issued and swallows any
+    // failure: recording acceptance must never deny an otherwise-valid sign-in (the magic
+    // link is already single-use-burned above, so a throw here would strand the user). The
+    // insert is idempotent — insert-if-absent, and the repository treats the unique-index
+    // collision from a concurrent double-consume as already-recorded.
+    private async Task RecordTermsAcceptanceAsync(MagicLinkToken token, string userId, CancellationToken cancellationToken)
+    {
+        if (token.AcceptedTermsVersion is not { } version)
+        {
+            return;
+        }
+
+        try
+        {
+            if (await termsAcceptances.ExistsAsync(userId, version, cancellationToken))
+            {
+                return;
+            }
+
+            await termsAcceptances.AddAsync(new TermsAcceptance
+            {
+                Id = Guid.NewGuid(),
+                UserId = userId,
+                TermsVersion = version,
+                AcceptedAt = DateTime.UtcNow,
+            }, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to record terms acceptance for {UserId} version {Version}; sign-in proceeds", userId, version);
+        }
     }
 
     // "alex.smith@x.com" -> "Alex Smith" — mirrors the frontend's nameFromEmail.

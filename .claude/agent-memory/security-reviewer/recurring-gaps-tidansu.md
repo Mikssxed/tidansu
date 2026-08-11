@@ -48,4 +48,22 @@ have been in what the checklist doesn't name.
   distinguishes "DB constraint hit" from "success". Where a constraint encodes cross-tenant
   state, 200-vs-500 leaks it.
 
+- **Best-effort/audit writes placed in the auth critical path without a try/catch =
+  fail-CLOSED.** B-29 (2026-08-11) added a `TermsAcceptance` consent insert into
+  `ConsumeMagicLinkCommandHandler` *between* the single-use magic-link burn and JWT
+  issuance, guarded against the null-version case but NOT wrapped — so any
+  `DbUpdateException` (incl. the `(UserId,TermsVersion)` unique-index collision the code
+  itself anticipates) or transient DB fault propagates, 500s the sign-in, and the link is
+  already spent. The design contract said "never regress sign-in / never throw"; guarding
+  only null satisfies it on paper, not on the exception path. Self-healing on retry, so
+  High-availability not Critical. Filed S-H1 in B-29's `security-review.md`. Pattern to
+  watch: any ancillary write (audit, analytics, consent) added downstream of an
+  irreversible auth step must be isolated (try/catch-log or moved after token issuance) and
+  treat a duplicate-key as idempotent success, not an error.
+- **Cascade-delete on an audit/consent table erases the evidence you built it to keep.**
+  B-29's `TermsAcceptance` FK is `OnDelete(Cascade)` to `AspNetUsers`; proof-of-consent is
+  exactly what GDPR expects you to *retain* after erasure. Latent today (no user-deletion
+  path exists), lands when one ships. Filed S-M1. On any new audit/legal-evidence table,
+  question cascade before it's paired with a deletion feature.
+
 See [[confirmed-protections-spaces]] for what's already verified and shouldn't be re-flagged.

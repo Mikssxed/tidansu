@@ -17,8 +17,16 @@ export function useAuth() {
     const spaces = useSpacesStore();
 
     /** Returns the dev sign-in link in development, otherwise null. */
-    async function requestMagicLink(email: string, returnUrl?: string): Promise<string | null> {
-        const res = await client.api.auth.magicLink.post({ email, returnUrl: returnUrl ?? null });
+    async function requestMagicLink(
+        email: string,
+        returnUrl?: string,
+        acceptedTermsVersion?: string
+    ): Promise<string | null> {
+        const res = await client.api.auth.magicLink.post({
+            email,
+            returnUrl: returnUrl ?? null,
+            acceptedTermsVersion,
+        });
         return res?.data?.devLink ?? null;
     }
 

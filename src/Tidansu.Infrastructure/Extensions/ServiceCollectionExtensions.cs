@@ -143,6 +143,7 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IRefreshTokensRepository, RefreshTokensRepository>();
         services.AddScoped<IMagicLinkTokensRepository, MagicLinkTokensRepository>();
+        services.AddScoped<ITermsAcceptancesRepository, TermsAcceptancesRepository>();
         services.AddScoped<ISpacesRepository, SpacesRepository>();
 
         // Stateless CSPRNG id minting (B-23) — safe as a singleton.

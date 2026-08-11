@@ -44,6 +44,7 @@ public class RequestMagicLinkCommandHandler(
             TokenHash = jwtService.HashRefreshToken(rawToken),
             CreatedAt = now,
             ExpiresAt = now.Add(Lifetime),
+            AcceptedTermsVersion = request.AcceptedTermsVersion,
         }, cancellationToken);
 
         var devLink = await emailSender.SendAsync(email, rawToken, request.ReturnUrl, cancellationToken);

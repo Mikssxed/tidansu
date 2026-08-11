@@ -17,4 +17,5 @@
 - [Frontend downgrade read-only seam](frontend_downgrade-readonly-seam.md) — over-cap read-only is a UI-only gate: computed in useLimits (slice store.spaces by cap, stable Id order), gated at the view layer not the store; server enforcement is a separate follow-up (B-17)
 - [Root-entity id can't be composite-keyed](arch_root-entity-id-cannot-be-composite-keyed.md) — Space is the FK principal so B-22's (SpaceId,Id) doesn't transfer; server-assign the id (CSPRNG), no migration. Traps: FR-6 optimistic-add reconcile + UseRateLimiter-before-auth (B-23)
 - [Server over-cap read-only gate](arch_server-overcap-readonly-gate.md) — B-24 whole-space gate ≠ count caps; B-25 server-sent IsOverCap; B-26 SpaceReadDto split + guard deepened to IsSpaceOverCapAsync (one oracle, four consumers)
+- [Legal consent / ToS seam](legal-consent-terms-seam.md) — B-29: version bridges request→token→consume; append-only TermsAcceptance (not User cols); /legal/* namespace reuses B-6 dead links; backend+frontend version constants must match
 </content>

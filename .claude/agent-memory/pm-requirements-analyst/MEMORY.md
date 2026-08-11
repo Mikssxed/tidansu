@@ -15,3 +15,4 @@
 - [Photo serving + lazy-load scoping (B-16)](photo-serving-lazy-load-b16.md) — scope swung narrow→full-photo-feature→narrow across 3 gates; final = payload/paging only (photo feature split to B-1); key finding: ItemDto read/write shape reuse + full-replace update can silently wipe photos
 - [Scoped-keys migration scoping (B-22)](scoped-keys-migration-b22.md) — data-migration-bearing security fixes get full FR template, not LIGHT-path; migration safety + oracle closure are standalone FRs
 - [Scoped space keys (B-23)](scoped-space-keys-b23.md) — Space is tenancy root, no composite-key option like B-22; requirements must leave server-assign vs (UserId,Id) as open question for tech-planning
+- [Terms of Service (B-29)](terms-of-service-b29.md) — consent-capture design for passwordless flow: recommend gating modal (not request-form checkbox); Privacy Policy scope left open

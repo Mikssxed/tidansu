@@ -19,6 +19,8 @@ export const AppViews = {
     space: () => import('@/views/SpaceView.vue'),
     pricing: () => import('@/views/PricingView.vue'),
     account: () => import('@/views/AccountView.vue'),
+    legalTerms: () => import('@/views/legal/TermsView.vue'),
+    legalPrivacy: () => import('@/views/legal/PrivacyView.vue'),
 };
 
 const createRoute = (
@@ -45,6 +47,8 @@ const router = createRouter({
         createRoute('/spaces/:id', 'space', LayoutType.PLAIN, true, true),
         createRoute('/pricing', 'pricing', LayoutType.APP, false),
         createRoute('/account', 'account', LayoutType.APP, true),
+        createRoute('/legal/terms', 'legalTerms', LayoutType.PLAIN, false),
+        createRoute('/legal/privacy', 'legalPrivacy', LayoutType.PLAIN, false),
     ],
 });
 
@@ -73,6 +77,8 @@ const TITLES: Partial<Record<AppRouteName, string>> = {
     space: 'Space',
     pricing: 'Pricing',
     account: 'Account',
+    legalTerms: 'Terms of Service',
+    legalPrivacy: 'Privacy Policy',
 };
 
 const BASE_TITLE = "Tidansu — Know what's on every shelf";

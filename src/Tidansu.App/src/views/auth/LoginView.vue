@@ -65,6 +65,37 @@
                     class="mt-1.5 h-11 w-full rounded-ctrl border border-border bg-surface-2 px-3.5 text-[15px] text-text placeholder:text-text-3 focus:border-border-strong focus:outline-none"
                 />
 
+                <label
+                    class="mt-5 flex cursor-pointer items-start gap-3 rounded-ctrl border bg-surface-2 p-3 transition-colors"
+                    :class="consentRowClass"
+                >
+                    <input
+                        type="checkbox"
+                        class="mt-0.5 size-4 shrink-0 cursor-pointer accent-pro"
+                        :checked="termsAccepted"
+                        @change="onToggleTerms"
+                    />
+                    <span class="text-[13px] leading-relaxed text-text-2">
+                        I accept the
+                        <button
+                            type="button"
+                            class="underline decoration-border-strong underline-offset-2 hover:text-text"
+                            @click.stop.prevent="openTermsModal"
+                        >
+                            Terms of Service
+                        </button>
+                        and
+                        <button
+                            type="button"
+                            class="underline decoration-border-strong underline-offset-2 hover:text-text"
+                            @click.stop.prevent="openPrivacyModal"
+                        >
+                            Privacy Policy
+                        </button>
+                        .
+                    </span>
+                </label>
+
                 <p
                     v-if="error"
                     class="mt-3 text-[13px] text-danger"
@@ -134,12 +165,57 @@
                 </div>
             </div>
         </BaseCard>
+
+        <!-- Read-Terms / Privacy modal — keeps the typed email in State A intact -->
+        <BaseModal
+            :open="legalModalOpen"
+            max-width="640px"
+            @close="closeLegalModal"
+        >
+            <div class="flex items-center gap-2">
+                <button
+                    type="button"
+                    class="rounded-chip px-3 py-1.5 text-[13px] font-medium transition-colors"
+                    :class="termsTabClass"
+                    @click="showTermsDoc"
+                >
+                    Terms of Service
+                </button>
+                <button
+                    type="button"
+                    class="rounded-chip px-3 py-1.5 text-[13px] font-medium transition-colors"
+                    :class="privacyTabClass"
+                    @click="showPrivacyDoc"
+                >
+                    Privacy Policy
+                </button>
+            </div>
+
+            <div class="mt-4 max-h-[60vh] overflow-y-auto pr-1">
+                <LegalTermsContent v-if="isTermsDocActive" />
+                <LegalPrivacyContent v-else />
+            </div>
+
+            <div class="mt-5 flex justify-end">
+                <BaseButton
+                    variant="secondary"
+                    @click="closeLegalModal"
+                >
+                    Close
+                </BaseButton>
+            </div>
+        </BaseModal>
     </div>
 </template>
 
 <script setup lang="ts">
     import { BaseButton, BaseCard, BaseIcon } from '@/components/base';
+    import BaseModal from '@/components/base/BaseModal.vue';
+    import LegalPrivacyContent from '@/components/legal/LegalPrivacyContent.vue';
+    import LegalTermsContent from '@/components/legal/LegalTermsContent.vue';
     import { useAuth } from '@/composables/useAuth';
+    import { useModal } from '@/composables/useModal';
+    import { TERMS_VERSION } from '@/data/legal';
     import { safeReturnUrl } from '@/utils/returnUrl';
     import { computed, onMounted, ref } from 'vue';
     import { useRoute, useRouter } from 'vue-router';
@@ -149,6 +225,7 @@
     const auth = useAuth();
     const router = useRouter();
     const route = useRoute();
+    const legalModal = useModal();
 
     const email = ref('');
     const sent = ref(false);
@@ -156,25 +233,73 @@
     const consuming = ref(false);
     const devLink = ref<string | null>(null);
     const error = ref<string | null>(null);
+    const termsAccepted = ref(false);
+    // Which document the read-Terms modal shows; the modal itself covers both
+    // the Terms of Service and the Privacy Policy behind one combined checkbox.
+    const activeLegalDoc = ref<'terms' | 'privacy'>('terms');
 
     const emailValid = computed(() => EMAIL_RE.test(email.value.trim()));
-    const sendDisabled = computed(() => !emailValid.value || sending.value);
+    const sendDisabled = computed(
+        () => !emailValid.value || sending.value || !termsAccepted.value
+    );
     const sendLabel = computed(() => (sending.value ? 'Sending…' : 'Send magic link'));
+    const consentRowClass = computed(() =>
+        termsAccepted.value ? 'border-pro/50' : 'border-border hover:border-border-strong'
+    );
+
+    const legalModalOpen = computed(() => legalModal.isOpen.value);
+    const isTermsDocActive = computed(() => activeLegalDoc.value === 'terms');
+    const termsTabClass = computed(() =>
+        isTermsDocActive.value ? 'bg-surface-3 text-text' : 'text-text-2 hover:text-text'
+    );
+    const privacyTabClass = computed(() =>
+        isTermsDocActive.value ? 'text-text-2 hover:text-text' : 'bg-surface-3 text-text'
+    );
 
     const returnUrl = computed(() => safeReturnUrl(route.query.returnUrl));
 
     async function sendLink() {
-        if (!emailValid.value || sending.value) return;
+        if (!emailValid.value || sending.value || !termsAccepted.value) return;
         error.value = null;
         sending.value = true;
         try {
-            devLink.value = await auth.requestMagicLink(email.value.trim(), returnUrl.value);
+            devLink.value = await auth.requestMagicLink(
+                email.value.trim(),
+                returnUrl.value,
+                TERMS_VERSION
+            );
             sent.value = true;
         } catch {
             error.value = "We couldn't send your link. Please try again.";
         } finally {
             sending.value = false;
         }
+    }
+
+    function onToggleTerms(event: Event) {
+        termsAccepted.value = (event.target as HTMLInputElement).checked;
+    }
+
+    function openTermsModal() {
+        activeLegalDoc.value = 'terms';
+        legalModal.open();
+    }
+
+    function openPrivacyModal() {
+        activeLegalDoc.value = 'privacy';
+        legalModal.open();
+    }
+
+    function showTermsDoc() {
+        activeLegalDoc.value = 'terms';
+    }
+
+    function showPrivacyDoc() {
+        activeLegalDoc.value = 'privacy';
+    }
+
+    function closeLegalModal() {
+        legalModal.close();
     }
 
     async function consumeToken(token: string, target?: string) {
@@ -202,6 +327,7 @@
         sent.value = false;
         devLink.value = null;
         error.value = null;
+        termsAccepted.value = false;
     }
 
     onMounted(() => {
