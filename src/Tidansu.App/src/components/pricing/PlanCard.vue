@@ -77,9 +77,11 @@
         plan: PlanDef;
         billing: 'month' | 'year';
         current: boolean;
+        /** When false the paid plan can't be bought yet — its CTA is disabled. */
+        purchasable?: boolean;
     }
 
-    const props = defineProps<Props>();
+    const props = withDefaults(defineProps<Props>(), { purchasable: true });
     const emit = defineEmits<{ choose: [] }>();
 
     const isFree = computed(() => props.plan.id === 'free');
@@ -119,6 +121,9 @@
         () => {
             if (props.current) return { label: 'Current plan', variant: 'secondary', disabled: true, showIcon: false };
             if (isFree.value) return { label: 'Switch to Free', variant: 'secondary', disabled: false, showIcon: false };
+            if (!props.purchasable) {
+                return { label: 'Not available yet', variant: 'secondary', disabled: true, showIcon: false };
+            }
             return { label: 'Upgrade to Pro', variant: 'primary', disabled: false, showIcon: true };
         }
     );

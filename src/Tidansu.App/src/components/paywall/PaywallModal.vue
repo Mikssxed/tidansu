@@ -55,13 +55,15 @@
         <div class="mt-6 flex flex-col gap-2">
             <BaseButton
                 class="w-full"
+                :variant="plansCta.variant"
                 @click="onSeePlans"
             >
                 <BaseIcon
+                    v-if="plansCta.showIcon"
                     name="sparkle"
                     :size="17"
                 />
-                See Pro plans
+                {{ plansCta.label }}
             </BaseButton>
             <BaseButton
                 variant="ghost"
@@ -72,15 +74,15 @@
             </BaseButton>
         </div>
 
-        <p class="mt-3 text-center text-[12px] text-text-3">
-            From $4/mo billed yearly · cancel anytime
-        </p>
+        <p class="mt-3 text-center text-[12px] text-text-3">{{ footnote }}</p>
     </BaseModal>
 </template>
 
 <script setup lang="ts">
     import { BaseBadge, BaseButton, BaseIcon, BaseModal } from '@/components/base';
+    import type { ButtonVariant } from '@/components/base/BaseButton.vue';
     import { useLimits } from '@/composables/useLimits';
+    import { paymentsEnabled } from '@/config/featureFlags';
     import { PAYWALL, PAYWALL_BENEFITS } from '@/data/paywall';
     import { useSessionStore } from '@/stores/useSessionStore';
     import { computed } from 'vue';
@@ -101,6 +103,20 @@
         return typeof cap === 'number' ? cap : 0;
     });
     const bodyText = computed(() => info.value.body(limit.value));
+
+    // With payments off there is nothing to buy — keep the route to the plan
+    // comparison but drop the price pitch and the purchase framing.
+    const plansCta = computed<{ label: string; variant: ButtonVariant; showIcon: boolean }>(() =>
+        paymentsEnabled
+            ? { label: 'See Pro plans', variant: 'primary', showIcon: true }
+            : { label: 'See what’s in Pro', variant: 'primary', showIcon: false }
+    );
+
+    const footnote = computed(() =>
+        paymentsEnabled
+            ? 'From $4/mo billed yearly · cancel anytime'
+            : 'Pro isn’t available to buy yet — payments aren’t switched on.'
+    );
 
     function onClose() {
         closePaywall();

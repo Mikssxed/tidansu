@@ -50,6 +50,12 @@
             </div>
         </div>
 
+        <!-- Payments off: say so before any upgrade CTA is reached -->
+        <PaymentsUnavailableNotice
+            v-if="showPaymentsNotice"
+            class="mt-8"
+        />
+
         <!-- Downgrade scheduled / billing notices -->
         <div
             v-if="showDowngradeNotice"
@@ -88,6 +94,7 @@
                 :plan="proPlan"
                 :billing="billing"
                 :current="isProPlanCurrent"
+                :purchasable="paymentsEnabled"
                 @choose="onUpgrade"
             />
         </div>
@@ -146,8 +153,9 @@
 <script setup lang="ts">
     import { BaseIcon } from '@/components/base';
     import CheckoutConsentStep from '@/components/pricing/CheckoutConsentStep.vue';
+    import PaymentsUnavailableNotice from '@/components/pricing/PaymentsUnavailableNotice.vue';
     import PlanCard from '@/components/pricing/PlanCard.vue';
-    import { checkoutConsentEnabled } from '@/config/featureFlags';
+    import { checkoutConsentEnabled, paymentsEnabled } from '@/config/featureFlags';
     import { useModal } from '@/composables/useModal';
     import { PLAN_FEATURES, planOf } from '@/data/plans';
     import type { Plan } from '@/data/types';
@@ -188,7 +196,13 @@
         })
     );
 
+    const paymentsFaq = {
+        q: 'Can I buy Pro right now?',
+        a: 'Not yet — payments aren’t switched on. The Free plan is fully usable in the meantime, and Pro opens up as soon as checkout is live.',
+    };
+
     const faqs = [
+        ...(paymentsEnabled ? [] : [paymentsFaq]),
         {
             q: 'What happens to my data if I downgrade?',
             a: 'Nothing is deleted. Spaces and items beyond the Free limits become read-only until you’re back under the cap or upgrade again.',
@@ -203,6 +217,9 @@
         if (!session.proAccessUntilLabel) return '';
         return `You’ll keep Pro until ${session.proAccessUntilLabel}, then switch to Free.`;
     });
+
+    // Only Free users see the notice — a Pro user has nothing left to buy here.
+    const showPaymentsNotice = computed(() => !paymentsEnabled && !isProPlanCurrent.value);
 
     const showDowngradeNotice = computed(
         () => downgradeRequested.value && session.cancellationScheduled && downgradeNotice.value !== ''
@@ -222,6 +239,8 @@
     }
 
     function onUpgrade() {
+        // Belt-and-braces: the CTA is already disabled while payments are off.
+        if (!paymentsEnabled) return;
         if (!session.isAuthenticated) {
             router.push({ name: 'login', query: { returnUrl: '/pricing' } });
             return;

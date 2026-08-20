@@ -14,3 +14,12 @@
  * unchanged until legal copy is finalized.
  */
 export const checkoutConsentEnabled: boolean = import.meta.env.VITE_CHECKOUT_CONSENT === 'true';
+
+/**
+ * Whether Pro can actually be purchased. When OFF, the app says so up front —
+ * upgrade CTAs are disabled and a "payments aren't available yet" notice shows on
+ * the pricing page, account plan card and paywall — instead of letting the user
+ * click through to a 503 from the backend's DisabledBillingService. Default OFF so
+ * a build without an explicit `VITE_PAYMENTS_ENABLED=true` ships payment-free.
+ */
+export const paymentsEnabled: boolean = import.meta.env.VITE_PAYMENTS_ENABLED === 'true';

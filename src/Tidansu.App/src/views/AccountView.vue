@@ -84,6 +84,10 @@
                 />
                 {{ cancelNotice }}
             </p>
+            <PaymentsUnavailableNotice
+                v-if="showPaymentsNotice"
+                class="mt-4"
+            />
             <div class="mt-4 flex flex-wrap gap-2.5">
                 <template v-if="isPro">
                     <BaseButton
@@ -104,13 +108,16 @@
                 <BaseButton
                     v-else
                     size="sm"
+                    :variant="upgradeCta.variant"
+                    :disabled="upgradeCta.disabled"
                     @click="goPricing"
                 >
                     <BaseIcon
+                        v-if="upgradeCta.showIcon"
                         name="sparkle"
                         :size="16"
                     />
-                    Upgrade to Pro
+                    {{ upgradeCta.label }}
                 </BaseButton>
             </div>
         </div>
@@ -235,8 +242,11 @@
 
 <script setup lang="ts">
     import { BaseBadge, BaseButton, BaseIcon } from '@/components/base';
+    import type { ButtonVariant } from '@/components/base/BaseButton.vue';
+    import PaymentsUnavailableNotice from '@/components/pricing/PaymentsUnavailableNotice.vue';
     import UsageMeter from '@/components/spaces/UsageMeter.vue';
     import { useAuth } from '@/composables/useAuth';
+    import { paymentsEnabled } from '@/config/featureFlags';
     import { useLimits } from '@/composables/useLimits';
     import { isInf } from '@/data/plans';
     import { useSessionStore } from '@/stores/useSessionStore';
@@ -252,6 +262,17 @@
 
     const user = computed(() => session.user);
     const isPro = computed(() => session.isPro);
+
+    // Payments off: tell Free users here rather than letting them walk into a 503.
+    const showPaymentsNotice = computed(() => !paymentsEnabled && !isPro.value);
+
+    const upgradeCta = computed<{ label: string; variant: ButtonVariant; disabled: boolean; showIcon: boolean }>(
+        () =>
+            paymentsEnabled
+                ? { label: 'Upgrade to Pro', variant: 'primary', disabled: false, showIcon: true }
+                : // Still let them read the plan comparison — just not as a purchase CTA.
+                  { label: 'See what’s in Pro', variant: 'secondary', disabled: false, showIcon: false }
+    );
     const caps = computed(() => session.caps);
     const planBadgeVariant = computed(() => (isPro.value ? 'pro' : 'neutral'));
 

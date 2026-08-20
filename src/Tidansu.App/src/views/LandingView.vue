@@ -185,6 +185,12 @@
                         <span class="text-[13px] text-text-3">/mo</span>
                     </div>
                     <div class="mt-1 text-[12px] text-text-3">Unlimited · photos · sync</div>
+                    <div
+                        v-if="showPaymentsNotice"
+                        class="mt-2 text-[12px] font-medium text-warn"
+                    >
+                        Not available to buy yet
+                    </div>
                 </div>
             </div>
         </section>
@@ -240,6 +246,10 @@
     import { BaseBadge, BaseButton, BaseIcon } from '@/components/base';
     import { zoneBgClasses } from '@/composables/useColorVariant';
     import type { IconName } from '@/components/icons';
+    import { paymentsEnabled } from '@/config/featureFlags';
+
+    /** Flags the pricing teaser's Pro tile while payments are switched off. */
+    const showPaymentsNotice = !paymentsEnabled;
 
     interface HeroChip {
         icon: IconName;
